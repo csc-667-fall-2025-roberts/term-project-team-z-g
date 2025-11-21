@@ -1,0 +1,36 @@
+{
+  "name": "term-project-team-z-g",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node-dev --respawn --transpile-only src/backend/server.ts",
+    "start": "node dist/backend/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/csc-667-fall-2025-roberts/term-project-team-z-g.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/csc-667-fall-2025-roberts/term-project-team-z-g/issues"
+  },
+  "homepage": "https://github.com/csc-667-fall-2025-roberts/term-project-team-z-g#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "pg": "^8.16.3",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/node": "^24.10.1",
+    "@types/socket.io": "^3.0.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  }
+}
