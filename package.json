@@ -11,6 +11,8 @@
     "dev:backend": "nodemon --exec ts-node src/backend/server.ts",
     "dev:live": "browser-sync start --proxy 'http://localhost:3001' --port 3000 --files 'src/backend/**/*.ts' 'src/backend/**/*.ejs' 'src/backend/public/**/*' --reload-delay 1000 --no-ui --no-open",
     "dev": "concurrently --names \"backend,frontend,live\" --prefix-colors \"green,blue,magenta\" \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:live\"",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "fix-lint": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "start:dev": "npm run dev"
   },
   "keywords": [],
@@ -32,7 +34,7 @@
     "browser-sync": "^3.0.4",
     "concurrently": "^9.2.1",
     "esbuild": "^0.25.10",
-    "eslint": "^9.39.1",
+    "eslint": "^8.48.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "husky": "^9.1.7",
@@ -45,6 +47,7 @@
     "typescript": "^5.9.2"
   },
   "lint-staged": {
+    "*.ts": "eslint --fix",
     "**/*": "prettier --write --ignore-unknown"
   }
 }

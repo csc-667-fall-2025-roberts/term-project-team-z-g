@@ -1,8 +1,8 @@
 // src/backend/server.ts
-import * as path from "path";
 import express from "express";
+import createHttpError from "http-errors";
 import morgan from "morgan";
-import createHttpError, { CreateHttpError } from "http-errors";
+import * as path from "path";
 
 import rootRoutes from "./routes/roots";
 import { testRouter } from "./routes/test";
