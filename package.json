@@ -3,29 +3,33 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build:backend": "rm -rf dist && tsc && cp -R src/backend/views dist/views",
+    "build:backend": "rm -rf; tsc; cp -R src/backend/views dist/views",
     "build:frontend": "esbuild src/frontend/entrypoint.ts --bundle --outfile=dist/public/js/bundle.js",
     "build": "npm run build:backend && npm run build:frontend",
     "start": "node dist/server.js",
     "dev:frontend": "esbuild src/frontend/entrypoint.ts --bundle --outfile=src/backend/public/js/bundle.js --sourcemap --target=es2020 --watch",
     "dev:backend": "nodemon --exec ts-node src/backend/server.ts",
-    "dev:live": "browser-sync start --proxy 'http://localhost:3001' --port 3000 --files 'src/backend/**/*.ts' 'src/backend/**/*.ejs' 'src/backend/public/**/*' --reload-delay 1000 --no-ui --no-open",
-    "dev": "concurrently --names \"backend,frontend,live\" --prefix-colors \"green,blue,magenta\" \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:live\"",
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
-    "fix-lint": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
-    "start:dev": "npm run dev"
+    "dev:live": "browser-sync start --proxy 'http://localhost:3000' --port 3001 --files 'src/backend/**/*.ts' 'src/backend/**/*.ejs' 'src/backend/public/**/*' --reload-delay 1000 --no-ui --no-open",
+    "start:dev": "concurrently --names \"backend,frontend,live\" --prefix-colors \"green,blue,magenta\" \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:live\"",
+    "migrate:create": "node-pg-migrate create -j ts --",
+    "migrate:up": "node-pg-migrate up",
+    "migrate:down": "node-pg-migrate down"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "dotenv": "^17.2.3",
     "ejs": "^3.1.10",
     "express": "^5.1.0",
     "http-errors": "^2.0.0",
-    "morgan": "^1.10.1"
+    "morgan": "^1.10.1",
+    "node-pg-migrate": "^8.0.3",
+    "pg-promise": "^12.3.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
     "@types/express": "^5.0.3",
     "@types/morgan": "^1.9.10",
     "@types/node": "^24.6.0",
@@ -33,10 +37,11 @@
     "@typescript-eslint/parser": "^8.48.0",
     "browser-sync": "^3.0.4",
     "concurrently": "^9.2.1",
-    "esbuild": "^0.25.10",
-    "eslint": "^8.48.0",
+    "esbuild": "^0.25.12",
+    "eslint": "^8.57.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
+    "globals": "^16.5.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.3",
     "nodemon": "^3.1.10",
@@ -44,7 +49,8 @@
     "prettier-plugin-ejs": "^1.0.3",
     "prettier-plugin-organize-imports": "^4.3.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.48.0"
   },
   "lint-staged": {
     "**/*": "prettier --write --ignore-unknown"

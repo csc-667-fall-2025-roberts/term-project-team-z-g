@@ -12,8 +12,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(morgan("dev"));
-app.use(express.static(path.join("dist", "public")));
-app.set("views", path.join(__dirname, "views"));
+app.use(express.static(path.join(process.cwd(), "src/backend/public")));
+app.set("views", path.join(process.cwd(), "src/backend/views"));
 app.set("view engine", "ejs");
 
 app.use("/", rootRoutes);
