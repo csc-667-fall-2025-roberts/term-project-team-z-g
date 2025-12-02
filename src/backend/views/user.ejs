@@ -1,0 +1,18 @@
+<html>
+  <head>
+    <title>User <%= user.id %></title>
+  </head>
+  <body>
+    <h1>User <%= user.id %></h1>
+
+    <dl>
+      <dt>Username</dt>
+      <dd><%= user.username %></dd>
+
+      <dt>Email</dt>
+      <dd><%= user.email %></dd>
+    </dl>
+
+    <a href="/users">Back to Users</a>
+  </body>
+</html>
