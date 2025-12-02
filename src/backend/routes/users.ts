@@ -7,6 +7,7 @@ router.get("/", async (_request, response) => {
   try {
     const users = await db.any("SELECT * FROM users");
     response.render("listing", { users });
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
     response.status(500).send("Error fetching users");
   }
@@ -17,6 +18,7 @@ router.get("/:id", async (request, response) => {
   try {
     const user = await db.one("SELECT * FROM users WHERE id = $1", [id]);
     response.render("user", { user });
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error: unknown) {
     response.redirect("/users");
   }
@@ -31,9 +33,10 @@ router.post("/", async (request, response) => {
       [username, email]
     );
     response.redirect(`/users/${id}`);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
     response.status(500).send("Error creating user");
   }
 });
 
-export { router as userRouter };
+export { router as userRoutes };
