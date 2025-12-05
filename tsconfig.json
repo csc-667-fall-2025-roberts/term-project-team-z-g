@@ -3,13 +3,14 @@
     "target": "es2020",
     "module": "commonjs",
     "paths": {
-      "*": ["./types/*.d.st"]
+      "*": ["./types/*.d.ts"]
     },
     "outDir": "./dist",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
+    "noImplicitAny": false,
     "skipLibCheck": true
   },
-  "include": ["src/backend/**/*"]
+  "include": ["src/**/*"]
 }
