@@ -48,9 +48,12 @@ app.use((_request, _response, next) => {
 // Error handler middleware (must be last)
 app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   void _next;
-  const errorObj = err as Record<string, unknown>;
-  const status = typeof errorObj.status === "number" ? (errorObj.status as number) : 500;
-  const message = typeof errorObj.message === "string" ? (errorObj.message as string) : "Internal Server Error";
+  const errorObj = typeof err === 'object' && err !== null
+    ? (err as { status?: unknown; message?: unknown; stack?: unknown })
+    : {};
+
+  const status = typeof errorObj.status === 'number' ? errorObj.status : 500;
+  const message = typeof errorObj.message === 'string' ? errorObj.message : 'Internal Server Error';
 
   console.error(`Error ${status}:`, message);
   if (isDev && typeof errorObj.stack === "string") {
