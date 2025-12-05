@@ -12,8 +12,8 @@
     "start:dev": "concurrently --names \"backend,frontend\" --prefix-colors \"green,blue\" \"npm run dev:backend\" \"npm run dev:frontend\"",
     "lint": "eslint src",
     "migrate:create": "node-pg-migrate create -j ts --",
-    "migrate:up": "node-pg-migrate up",
-    "migrate:down": "node-pg-migrate down"
+    "migrate:up": "node-pg-migrate up -j ts",
+    "migrate:down": "node-pg-migrate down -j ts"
   },
   "keywords": [],
   "author": "",
@@ -23,6 +23,7 @@
     "dotenv": "^17.2.3",
     "ejs": "^3.1.10",
     "express": "^5.1.0",
+    "express-session": "^1.18.2",
     "http-errors": "^2.0.0",
     "morgan": "^1.10.1",
     "node-pg-migrate": "^8.0.3",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@types/express": "^5.0.3",
+    "@types/express-session": "^1.18.2",
     "@types/morgan": "^1.9.10",
     "@types/node": "^24.6.0",
     "@typescript-eslint/eslint-plugin": "^8.48.0",

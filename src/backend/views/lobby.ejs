@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Lobby – Hidden Joker Rummy</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/main.css" />
+  </head>
+  <body>
+    <nav class="navbar navbar-dark bg-dark shadow-sm">
+      <div class="container d-flex justify-content-between align-items-center">
+        <a class="navbar-brand" href="/lobby">Hidden Joker Rummy</a>
+        <div class="d-flex align-items-center gap-3">
+          <% if (typeof currentUser !== 'undefined') { %>
+            <span class="text-light small">Logged in as <strong><%= currentUser.username %></strong></span>
+          <% } %>
+          <a href="/auth/logout" class="btn btn-outline-light btn-sm">Logout</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="main-container">
+      <div class="container game-grid">
+        <!-- Left: games & create form -->
+        <section>
+          <div class="card mb-3 shadow">
+            <div class="card-body">
+              <h2 class="h5 mb-3">Create Game</h2>
+              <form method="post" action="/lobby/create-game" class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label">Game Name</label>
+                  <input type="text" name="name" class="form-control" placeholder="Friday Night Rummy" required />
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Max Players</label>
+                  <input type="number" name="max_players" class="form-control" min="2" max="4" value="4" required />
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                  <button type="submit" class="btn btn-primary w-100">Create</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card shadow">
+            <div class="card-body">
+              <h2 class="h5 mb-3">Available Games</h2>
+              <% if (!games || games.length === 0) { %>
+                <p class="text-muted mb-0">No games yet. Create one to get started!</p>
+              <% } else { %>
+                <ul class="list-group list-group-flush">
+                  <% games.forEach(game => { %>
+                    <li class="list-group-item bg-transparent text-light d-flex justify-content-between">
+                      <div>
+                        <strong><%= game.name %></strong>
+                        <div class="small text-muted">
+                          State: <%= game.state %> · Max Players: <%= game.max_players %>
+                        </div>
+                      </div>
+                      <a href="/games/<%= game.id %>" class="btn btn-sm btn-outline-light align-self-center">
+                        Join
+                      </a>
+                    </li>
+                  <% }) %>
+                </ul>
+              <% } %>
+            </div>
+          </div>
+        </section>
+
+        <!-- Right: chat placeholder -->
+        <aside>
+          <div class="card shadow">
+            <div class="card-body">
+              <h2 class="h6 mb-3">Lobby Chat (Coming Soon)</h2>
+              <div class="border rounded p-2 mb-2" style="min-height: 160px; background:#151a30;">
+                <p class="text-muted small mb-0">Chat messages will appear here.</p>
+              </div>
+              <form>
+                <div class="input-group">
+                  <input type="text" class="form-control" placeholder="Type a message..." disabled />
+                  <button class="btn btn-secondary" type="button" disabled>Send</button>
+                </div>
+                <div class="form-text text-muted">Real-time chat will be implemented in a later milestone.</div>
+              </form>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,261 @@
+/* Global Page Styling */
+
+body {
+  background: radial-gradient(circle at top, #1d2545 0%, #050814 55%, #020308 100%);
+  color: #f5f5f5;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Navbar */
+.navbar {
+  background: linear-gradient(90deg, #040716, #11182d) !important;
+  border-bottom: 1px solid #252b4a;
+}
+
+.navbar-brand {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.95rem;
+}
+
+/* Main layout wrapper */
+.main-container {
+  flex: 1;
+  padding: 2rem 1rem;
+}
+
+@media (min-width: 992px) {
+  .main-container {
+    padding: 2.5rem 0;
+  }
+}
+
+/* Generic card styling */
+.card {
+  border-radius: 0.9rem;
+  background: radial-gradient(circle at top left, #1c2238 0%, #10162b 55%);
+  border: 1px solid #252b4a;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.card-body {
+  color: #e6e6e6;
+}
+
+/* Gentle hover on cards */
+.card.hoverable:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 22px 45px rgba(0, 0, 0, 0.7);
+  border-color: #ff6b3d;
+}
+
+/* Buttons */
+.btn-primary {
+  background: linear-gradient(135deg, #ff6b3d, #ff945f);
+  border-color: #ff6b3d;
+  box-shadow: 0 8px 20px rgba(255, 107, 61, 0.45);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #ff825a, #ffb37e);
+  border-color: #ff825a;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(255, 130, 90, 0.55);
+}
+
+.btn-outline-light {
+  border-color: #686f9b;
+  color: #fefefe;
+}
+
+.btn-outline-light:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #ff6b3d;
+  color: #ffffff;
+}
+
+/* Forms */
+.form-control {
+  background-color: #1c2238;
+  border-color: #3b4160;
+  color: #f1f1f1;
+  border-radius: 0.65rem;
+}
+
+.form-control::placeholder {
+  color: #8489aa;
+}
+
+.form-control:focus {
+  border-color: #ff6b3d;
+  box-shadow: 0 0 0 0.18rem rgba(255, 107, 61, 0.35);
+  background-color: #1c2238;
+  color: #fff;
+}
+
+/* Auth Page Layout (Login/Signup) */
+
+.auth-wrapper {
+  min-height: calc(100vh - 56px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-card {
+  max-width: 460px;
+  width: 100%;
+}
+
+/* Lobby Layout */
+
+.game-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .game-grid {
+    grid-template-columns: 2fr 1.3fr;
+  }
+}
+
+/* Game list items */
+.list-group-item {
+  border-color: transparent;
+}
+
+.list-group-item.bg-transparent {
+  background: transparent;
+}
+
+.list-group-item.bg-transparent:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/*  Game Page Styling */
+
+.game-board {
+  min-height: 280px;
+  background: radial-gradient(circle at top, #1d2545 0%, #11162b 60%);
+  border-radius: 0.9rem;
+  padding: 1.5rem;
+  border: 1px solid #30375b;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.65);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Soft glow edges on board */
+.game-board::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: radial-gradient(circle at top, rgba(255, 107, 61, 0.12), transparent 60%);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Keep inner content readable */
+.game-board > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Brighten ALL text inside game board */
+.game-board,
+.game-board * {
+  color: #f1f1f1 !important;
+}
+
+/* Section title inside game (Table Center, Your Hand, etc.) */
+.game-zone-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: #ffd4a8 !important;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+/* Muted descriptive text */
+.game-board .text-muted,
+.game-board .text-muted * {
+  color: #bfc4e5 !important;
+}
+
+/* Inner "card-like" zones: discard pile, deck, other players */
+.game-board .card {
+  background: linear-gradient(145deg, #202642, #141a31);
+  border: 1px solid #394066;
+  border-radius: 0.7rem;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+  padding: 0.75rem 1.2rem;
+}
+
+.game-board .card * {
+  color: #f8f8f8 !important;
+  font-size: 0.82rem;
+}
+
+/* Center area (discard + deck) alignment tweak */
+.game-center-row {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+/* "Your Hand" area */
+.game-hand-area {
+  margin-top: 0.5rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px dashed #3d4570;
+  background: rgba(10, 14, 32, 0.75);
+}
+
+/* "Other Players" pill cards */
+.player-pill {
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid #3f466a;
+  background: linear-gradient(145deg, #1c223b, #11162a);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.55);
+  font-size: 0.78rem;
+}
+
+/* Chat Placeholder Styling */
+
+.chat-box {
+  background: #151a30;
+  border: 1px solid #2b3154;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  min-height: 160px;
+  color: #c7cbdf;
+  font-size: 0.9rem;
+}
+
+/* Utility Helpers */
+
+.text-light {
+  color: #f1f1f1 !important;
+}
+
+.text-muted {
+  color: #c2c6dd !important;
+}
+
+.border-secondary {
+  border-color: #3f466a !important;
+}
+
+.bg-dark {
+  background-color: #0c1126 !important;
+}

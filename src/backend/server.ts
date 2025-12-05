@@ -2,62 +2,107 @@ import express from "express";
 import createHttpError from "http-errors";
 import morgan from "morgan";
 import * as path from "path";
-
+import session from "express-session";
 import bodyParser from "body-parser";
 import { configDotenv } from "dotenv";
+
 import rootRoutes from "./routes/roots";
 import { userRoutes } from "./routes/users";
+import authRoutes from "./routes/auth";
+import lobbyRoutes from "./routes/lobby";
+import gamesRoutes from "./routes/games";
 
 configDotenv();
 
 const app = express();
-
 const PORT = process.env.PORT || 3001;
 const isDev = process.env.NODE_ENV !== "production";
 
+// --- Middleware setup ---
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "dev-secret",
+    resave: false,
+    saveUninitialized: false,
+  })
+);
+
 app.use(morgan("dev"));
-app.use(bodyParser.urlencoded());
+app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-// In dev mode, serve from src/backend/public so browser-sync can detect changes
-// In production, serve from dist/public
+// Serve static files (CSS, JS, images)
 const publicDir = isDev
   ? path.join(process.cwd(), "src", "backend", "public")
   : path.join("dist", "public");
 app.use(express.static(publicDir));
 
-// In dev mode, views are in src/backend/views; in production they're in dist/views
+// Views location + engine
 const viewsDir = isDev
   ? path.join(process.cwd(), "src", "backend", "views")
   : path.join(__dirname, "views");
 app.set("views", viewsDir);
 app.set("view engine", "ejs");
 
-app.use("/", rootRoutes);
-app.use("/users", userRoutes);
+// Make currentUser available to all views
+app.use((req, res, next) => {
+  const s: any = (req as any).session;
+  if (s && s.userId) {
+    res.locals.currentUser = { id: s.userId, username: s.username };
+  } else {
+    res.locals.currentUser = null;
+  }
+  next();
+});
 
+// --- Routes ---
+
+// Redirect root to login or lobby based on session
+app.get("/", (req, res) => {
+  const s: any = (req as any).session;
+  if (s && s.userId) {
+    return res.redirect("/lobby");
+  }
+  return res.redirect("/auth/login");
+});
+
+// Auth routes (login, signup, logout)
+app.use("/auth", authRoutes);
+
+// Lobby + game routes
+app.use("/lobby", lobbyRoutes);
+app.use("/games", gamesRoutes);
+
+// Existing example routes (optional)
+app.use("/users", userRoutes);
+app.use("/", rootRoutes);
+
+// 404 handler
 app.use((_request, _response, next) => {
-  next(createHttpError(404));
+  next(createHttpError(404, "Page not found"));
 });
 
 // Error handler middleware (must be last)
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  const status = err.status || 500;
-  const message = err.message || "Internal Server Error";
+app.use(
+  (
+    err: any,
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction
+  ) => {
+    const status = err.status || 500;
+    const message = err.message || "Internal Server Error";
 
-  console.error(`Error ${status}:`, message);
-  if (isDev && err.stack) {
-    console.error(err.stack);
+    console.error(`Error ${status}:`, message);
+    if (isDev && err.stack) {
+      console.error(err.stack);
+    }
+
+    // Render your styled error page
+    res.status(status).render("error", { message });
   }
-
-  res
-    .status(status)
-    .send(
-      isDev
-        ? `<html><body><h1>Error ${status}</h1><pre>${message}\n\n${err.stack || ""}</pre></body></html>`
-        : `<html><body><h1>Error ${status}</h1><p>${message}</p></body></html>`,
-    );
-});
+);
 
 const server = app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
