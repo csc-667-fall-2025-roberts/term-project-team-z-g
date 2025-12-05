@@ -3,15 +3,37 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="current-user" content="<%= user.username %>" />
     <title>Lobby</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/css/chat.css" />
+    <script src="/js/bundle.js" defer></script>
+    <style>
+    
+    </style>
   </head>
   <body>
     <a href="/auth/logout">Logout</a>
     <h1>
       Hello
       <%= user.username %>
-      (<%= user.email %>)
+      (<%= user.id %>)
     </h1>
+    <div id="chat-area">
+      <div id="message-listing"></div>
+      <form id="message-submit">
+        <input type="text" placeholder="Enter your message..." />
+        <button>Send</button>
+      </form>
+    </div>
+    <template id="template-chat-message">
+      <div class="chat-message">
+        <div class="message-header">
+          <span class="message-username"></span>:
+          <span class="message-time"></span>
+        </div>
+        <div class="message-text"></div>
+      </div>
+    </template>
   </body>
 </html>

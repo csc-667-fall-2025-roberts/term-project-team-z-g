@@ -1,32 +1,5 @@
-# Node modules
 node_modules/
-
-# Environment variables
-.env
-
-# TypeScript build output
 dist/
-build/
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# VS Code settings
-.vscode/
-
-# Temporary files
-*.tmp
-
-# Cache
-.cache/
-.parcel-cache/
-
-# TS node dev cache
-.ts-node/
+logs/
+.env
+src/backend/public/js/

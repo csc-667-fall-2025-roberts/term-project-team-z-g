@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt";
-import type { SecureUser, User } from "../../../types/types";
+import type { SecureUser, User } from "../../types/types";
 import db from "../connection";
 import { LOGIN, SIGNUP } from "./sql";
 
@@ -15,16 +15,21 @@ const signup = async (username: string, email: string, clearTextPassword: string
 };
 
 const login = async (username: string, clearTextPassword: string) => {
-  const secureUser = await db.one<SecureUser> (LOGIN, [username]);
+  // Use oneOrNone so we can handle the "no rows" case without an exception
+  const secureUser = await db.oneOrNone<SecureUser>(LOGIN, [username]);
 
-  if (await bcrypt.compare(clearTextPassword, secureUser.password)) {
-    const { id, username, email, created_at } = secureUser;
-    
-    return { id, username, email, created_at };
-  } else {
-    throw "Invalid login information";
+  if (!secureUser) {
+    // No user found with that username
+    throw new Error("Invalid login information");
   }
 
+  const isValid = await bcrypt.compare(clearTextPassword, secureUser.password);
+  if (!isValid) {
+    throw new Error("Invalid login information");
+  }
+
+  const { id, username: uname, email, created_at } = secureUser;
+  return { id, username: uname, email, created_at };
 };
 
 export { login, signup };

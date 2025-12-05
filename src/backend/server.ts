@@ -6,23 +6,62 @@ import { sessionMiddleware } from "./config/session";
 import bodyParser from "body-parser";
 import { configDotenv } from "dotenv";
 import * as routes from "./routes";
-import { requireUser } from "./middleware";
+import { requireGuest, requireUser } from "./middleware";
+import { createServer } from "http";
+import logger from "./lib/logger";
 
 configDotenv();
 
+// Set up livereload in development (optional)
+const isDevelopment = process.env.NODE_ENV !== "production";
+if (isDevelopment) {
+  try {
+    // require optional dev dependency
+     
+    const livereload = require("livereload");
+    const liveReloadServer = livereload.createServer({ exts: ["ejs", "css", "js"] });
+    liveReloadServer.watch([path.join(__dirname, "views"), path.join(__dirname, "public")]);
+  } catch (err) {
+    logger.warn("livereload not installed; skipping live reload");
+  }
+}
+
 const app = express();
+const httpServer = createServer(app);
+
+app.set("trust proxy", 1);
+
+// Try to initialize sockets if available (optional)
+try {
+   
+  const initSockets = require("./sockets").default;
+  if (typeof initSockets === "function") {
+    app.set("io", initSockets(httpServer));
+  }
+} catch (err) {
+  logger.info("Socket initialization skipped (no ./sockets module)");
+  logger.error(String(err));
+}
 
 const PORT = process.env.PORT || 3000;
-const isDev = process.env.NODE_ENV !== "production";
 
+// Inject livereload script in development (optional)
+if (isDevelopment) {
+  try {
+     
+    const connectLivereload = require("connect-livereload");
+    app.use(connectLivereload());
+  } catch (err) {
+    logger.warn("connect-livereload not installed; skipping injection of livereload script");
+  }
+}
 
 // Filter out browser-generated requests from logs
 app.use(
   morgan("dev", {
-    skip: (req) => req.url.startsWith("/.well-known"),
+    skip: (req) => req.url.startsWith("/.well-known/"),
   }),
 );
-
 app.use(bodyParser.urlencoded());
 app.use(bodyParser.json());
 
@@ -35,44 +74,50 @@ app.use(express.static(path.join(__dirname, "public")));
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
-app.use(sessionMiddleware)
+app.use(sessionMiddleware);
 
 app.use("/", routes.root);
 app.use("/auth", routes.auth);
 app.use("/lobby", requireUser, routes.lobby);
+// Optional routes (chat/games) not present in all branches
+app.use("/chat", requireUser, routes.chat);
+//app.use("/games", requireUser, routes.games);
 
 app.use((_request, _response, next) => {
   next(createHttpError(404));
 });
 
 // Error handler middleware (must be last)
-app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  void _next;
-  const errorObj = typeof err === 'object' && err !== null
-    ? (err as { status?: unknown; message?: unknown; stack?: unknown })
-    : {};
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const status = err.status || 500;
+  const message = err.message || "Internal Server Error";
+  const isProduction = process.env.NODE_ENV === "production";
 
-  const status = typeof errorObj.status === 'number' ? errorObj.status : 500;
-  const message = typeof errorObj.message === 'string' ? errorObj.message : 'Internal Server Error';
+  // Skip logging browser-generated requests
+  if (!req.url.startsWith("/.well-known/")) {
+    const errorMsg = `${message} (${req.method} ${req.url})`;
 
-  console.error(`Error ${status}:`, message);
-  if (isDev && typeof errorObj.stack === "string") {
-    console.error(errorObj.stack);
+    if (isProduction) {
+      // Production: Log to file with full stack, show concise console message
+      logger.error(`${errorMsg} - stack: ${String((err as any)?.stack)}`);
+      console.error(`Error ${status}: ${message} - See logs/error.log for details`);
+    } else {
+      // Development: Log everything to console
+      logger.error(`${errorMsg} - ${String(err)}`);
+    }
   }
 
-  res
-    .status(status)
-    .send(
-      isDev
-        ? `<html><body><h1>Error ${status}</h1><pre>${message}\n\n${typeof errorObj.stack === 'string' ? errorObj.stack : ""}</pre></body></html>`
-        : `<html><body><h1>Error ${status}</h1><p>${message}</p></body></html>`,
-    );
+  res.status(status).render("errors/error", {
+    status,
+    message,
+    stack: isProduction ? null : err.stack,
+  });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`Server started on port ${PORT}`);
+const server = httpServer.listen(PORT, () => {
+  logger.info(`Server started on port ${PORT}`);
 });
 
-server.on("error", (error) => {
-  console.error("Server error:", error);
+httpServer.on("error", (error) => {
+  logger.error(`Server error: ${String(error)}`);
 });
