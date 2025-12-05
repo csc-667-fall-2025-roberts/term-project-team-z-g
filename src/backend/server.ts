@@ -2,59 +2,66 @@ import express from "express";
 import createHttpError from "http-errors";
 import morgan from "morgan";
 import * as path from "path";
-
+import { sessionMiddleware } from "./config/session";
 import bodyParser from "body-parser";
 import { configDotenv } from "dotenv";
-import rootRoutes from "./routes/roots";
-import { userRoutes } from "./routes/users";
+import * as routes from "./routes";
+import { requireUser } from "./middleware";
 
 configDotenv();
 
 const app = express();
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 const isDev = process.env.NODE_ENV !== "production";
 
-app.use(morgan("dev"));
+
+// Filter out browser-generated requests from logs
+app.use(
+  morgan("dev", {
+    skip: (req) => req.url.startsWith("/.well-known"),
+  }),
+);
+
 app.use(bodyParser.urlencoded());
 app.use(bodyParser.json());
 
-// In dev mode, serve from src/backend/public so browser-sync can detect changes
-// In production, serve from dist/public
-const publicDir = isDev
-  ? path.join(process.cwd(), "src", "backend", "public")
-  : path.join("dist", "public");
-app.use(express.static(publicDir));
+// Serve static files from public directory (relative to this file's location)
+// Dev: src/backend/public | Prod: dist/public
+app.use(express.static(path.join(__dirname, "public")));
 
-// In dev mode, views are in src/backend/views; in production they're in dist/views
-const viewsDir = isDev
-  ? path.join(process.cwd(), "src", "backend", "views")
-  : path.join(__dirname, "views");
-app.set("views", viewsDir);
+// Set views directory (relative to this file's location)
+// Dev: src/backend/views | Prod: dist/views
+app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
-app.use("/", rootRoutes);
-app.use("/users", userRoutes);
+app.use(sessionMiddleware)
+
+app.use("/", routes.root);
+app.use("/auth", routes.auth);
+app.use("/lobby", requireUser, routes.lobby);
 
 app.use((_request, _response, next) => {
   next(createHttpError(404));
 });
 
 // Error handler middleware (must be last)
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  const status = err.status || 500;
-  const message = err.message || "Internal Server Error";
+app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  void _next;
+  const errorObj = err as Record<string, unknown>;
+  const status = typeof errorObj.status === "number" ? (errorObj.status as number) : 500;
+  const message = typeof errorObj.message === "string" ? (errorObj.message as string) : "Internal Server Error";
 
   console.error(`Error ${status}:`, message);
-  if (isDev && err.stack) {
-    console.error(err.stack);
+  if (isDev && typeof errorObj.stack === "string") {
+    console.error(errorObj.stack);
   }
 
   res
     .status(status)
     .send(
       isDev
-        ? `<html><body><h1>Error ${status}</h1><pre>${message}\n\n${err.stack || ""}</pre></body></html>`
+        ? `<html><body><h1>Error ${status}</h1><pre>${message}\n\n${typeof errorObj.stack === 'string' ? errorObj.stack : ""}</pre></body></html>`
         : `<html><body><h1>Error ${status}</h1><p>${message}</p></body></html>`,
     );
 });

@@ -3,5 +3,6 @@
   "schema": "public",
   "dir": "migrations",
   "ignorePattern": "^\\.",
-  "extension": "js"
+  "extension": "ts",
+  "requireModule": "ts-node/cjs"
 }
