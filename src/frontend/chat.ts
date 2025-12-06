@@ -1,6 +1,6 @@
 import socketIo from "socket.io-client";
 import * as chatKeys from "../shared/chat-key";
-import type { ChatMessage } from "../backend/types/types";
+import type { ChatMessageWithUser } from "../backend/types/types";
 
 const socket = socketIo();
 
@@ -9,7 +9,9 @@ const input = document.querySelector<HTMLInputElement>("#message-submit input")!
 const button = document.querySelector<HTMLButtonElement>("#message-submit button")!;
 const messageTemplate = document.querySelector<HTMLTemplateElement>("#template-chat-message")!;
 
-const appendMessage = ({ username, created_at, message }: ChatMessage) => {
+const appendMessage = (payload: any) => {
+  const { username, created_at, message } = payload;
+
   const clone = messageTemplate.content.cloneNode(true) as DocumentFragment;
 
   const timeSpan = clone.querySelector(".message-time");
@@ -28,7 +30,7 @@ const appendMessage = ({ username, created_at, message }: ChatMessage) => {
   listing.appendChild(clone);
 };
 
-socket.on(chatKeys.CHAT_LISTING, ({ messages }: { messages: ChatMessage[] }) => {
+socket.on(chatKeys.CHAT_LISTING, ({ messages }: { messages: ChatMessageWithUser[] }) => {
   console.log(chatKeys.CHAT_LISTING, { messages });
 
   messages.forEach((message) => {
@@ -39,12 +41,12 @@ socket.on(chatKeys.CHAT_LISTING, ({ messages }: { messages: ChatMessage[] }) => 
 socket.on(
   chatKeys.CHAT_MESSAGE,
   // server emits `{ message: ChatMessage }` but some callers may emit the raw ChatMessage
-  (payload: { message: ChatMessage } | ChatMessage) => {
+  (payload: { message: ChatMessageWithUser } | ChatMessageWithUser) => {
     console.log(chatKeys.CHAT_MESSAGE, payload);
 
     // normalize payload: prefer `payload.message` if present
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const msg = (payload as any).message ?? (payload as ChatMessage);
+    const msg = (payload as any).message ?? (payload as ChatMessageWithUser);
 
     appendMessage(msg);
   }

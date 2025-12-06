@@ -107,7 +107,7 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
     }
   }
 
-  res.status(status).render("errors/error", {
+  res.status(status).render("error/error", {
     status,
     message,
     stack: isProduction ? null : err.stack,

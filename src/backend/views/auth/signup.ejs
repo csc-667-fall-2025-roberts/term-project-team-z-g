@@ -1,39 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Sign Up</title>
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-        <style>
-            a {
-                color: blue;
-            }
-            a:visited {
-                color: blue;
-            }
-            a:hover {
-                color: blue;
-            }
-            a:active {
-                color: blue;
-            }
-        </style>
-    </head>
-    <body>
-        <form method="POST" action="/auth/signup">
-            <label for="username">Username:</label>
-            <input type="text" name="username" />
-
-            <label for="email">Email:</label>
-            <input type="text" name="email" />
-
-            <label for="password">Password:</label>
-            <input type="password" name="password" />
-
-            <button type="submit">Create User</button>
-
-            <a href="/auth/login">Login</a>
-        </form>
-    </body>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign Up</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<style>
+a {
+  color: blue;
+}
+a:visited {
+  color: blue;
+}
+a:hover {
+  color: blue;
+}
+a:active {
+  color: blue;
+}
+.error {
+  color: red;
+  margin-bottom: 10px;
+  padding: 10px;
+  background-color: #ffe6e6;
+  border: 1px solid red;
+  border-radius: 4px;
+}
+</style>
+</head>
+<body>
+<form method="POST" action="/auth/signup">
+<% if (local && local.error) { %>
+  <p class="error"><%= local.error %></p>
+<% } %>
+<label for="username">Username:</label>
+<input type="text" name="username" required />
+<label for="email">Email:</label>
+<input type="email" name="email" required />
+<label for="password">Password:</label>
+<input type="password" name="password" required />
+<button type="submit">Create User</button>
+<a href="/auth/login">Login</a>
+</form>
+</body>
 </html>
