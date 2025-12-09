@@ -1,10 +1,25 @@
 import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
-import { defineConfig } from "eslint/config";
 
-export default defineConfig([
-  { files: ["**/*.{js,mjs,cjs,ts,mts,cts}"], plugins: { js }, extends: ["js/recommended"], languageOptions: { globals: globals.browser } },
-  { files: ["**/*.js"], languageOptions: { sourceType: "commonjs" } },
-  tseslint.configs.recommended,
-]);
+export default [
+  {
+    ignores: [
+      "src/backend/public/js/**",
+      "**/node_modules/**",
+      ".git/**",
+      "**/.DS_Store",
+      "dist/**",
+    ],
+  },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    files: ["**/*.ts"],
+    languageOptions: {
+      globals: globals.browser,
+      ecmaVersion: 2020,
+      sourceType: "module",
+    },
+  },
+];

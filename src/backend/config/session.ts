@@ -7,7 +7,8 @@ const pgPool = db.$pool;
 
 export const sessionMiddleware = session({
   store: new PgSession({
-    pool: pgPool,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pool: pgPool as any,
     tableName: "session",
   }),
   secret: process.env.SESSION_SECRET || "this should not be used",

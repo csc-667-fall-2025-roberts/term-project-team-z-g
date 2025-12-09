@@ -2,112 +2,122 @@ import express from "express";
 import createHttpError from "http-errors";
 import morgan from "morgan";
 import * as path from "path";
-import session from "express-session";
+import { sessionMiddleware } from "./config/session";
 import bodyParser from "body-parser";
 import { configDotenv } from "dotenv";
-
-import rootRoutes from "./routes/roots";
-import { userRoutes } from "./routes/users";
-import authRoutes from "./routes/auth";
-import lobbyRoutes from "./routes/lobby";
-import gamesRoutes from "./routes/games";
+import * as routes from "./routes";
+import { requireUser } from "./middleware";
+import { createServer } from "http";
+import logger from "./lib/logger";
 
 configDotenv();
 
+// Set up livereload in development (optional)
+const isDevelopment = process.env.NODE_ENV !== "production";
+if (isDevelopment) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const livereload = require("livereload");
+    const liveReloadServer = livereload.createServer({ exts: ["ejs", "css", "js"] });
+    liveReloadServer.watch([path.join(__dirname, "views"), path.join(__dirname, "public")]);
+  } catch (_err) {
+    logger.warn("livereload not installed; skipping live reload");
+  }
+}
+
 const app = express();
-const PORT = process.env.PORT || 3001;
-const isDev = process.env.NODE_ENV !== "production";
+const httpServer = createServer(app);
 
-// --- Middleware setup ---
+app.set("trust proxy", 1);
 
+// Try to initialize sockets if available (optional)
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+  const initSockets = require("./sockets").default;
+  if (typeof initSockets === "function") {
+    app.set("io", initSockets(httpServer));
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (_err) {
+    logger.info("Socket initialization skipped (no ./sockets module)");
+    logger.error(String(_err));
+  }// Filter out browser-generated requests from logs
+if (isDevelopment) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const connectLivereload = require("connect-livereload");
+    app.use(connectLivereload());
+  } catch (_err) {
+    logger.warn("connect-livereload not installed; skipping injection of livereload script");
+  }
+}
+
+// Filter out browser-generated requests from logs
 app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "dev-secret",
-    resave: false,
-    saveUninitialized: false,
-  })
+  morgan("dev", {
+    skip: (req) => req.url.startsWith("/.well-known/"),
+  }),
 );
-
-app.use(morgan("dev"));
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded());
 app.use(bodyParser.json());
 
-// Serve static files (CSS, JS, images)
-const publicDir = isDev
-  ? path.join(process.cwd(), "src", "backend", "public")
-  : path.join("dist", "public");
-app.use(express.static(publicDir));
+// Serve static files from public directory (relative to this file's location)
+// Dev: src/backend/public | Prod: dist/public
+app.use(express.static(path.join(__dirname, "public")));
 
-// Views location + engine
-const viewsDir = isDev
-  ? path.join(process.cwd(), "src", "backend", "views")
-  : path.join(__dirname, "views");
-app.set("views", viewsDir);
+// Set views directory (relative to this file's location)
+// Dev: src/backend/views | Prod: dist/views
+app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
-// Make currentUser available to all views
-app.use((req, res, next) => {
-  const s: any = (req as any).session;
-  if (s && s.userId) {
-    res.locals.currentUser = { id: s.userId, username: s.username };
-  } else {
-    res.locals.currentUser = null;
-  }
-  next();
-});
+app.use(sessionMiddleware);
 
-// --- Routes ---
+app.use("/", routes.root);
+app.use("/auth", routes.auth);
+app.use("/lobby", requireUser, routes.lobby);
+// Optional routes (chat/games) not present in all branches
+app.use("/chat", requireUser, routes.chat);
+//app.use("/games", requireUser, routes.games);
 
-// Redirect root to login or lobby based on session
-app.get("/", (req, res) => {
-  const s: any = (req as any).session;
-  if (s && s.userId) {
-    return res.redirect("/lobby");
-  }
-  return res.redirect("/auth/login");
-});
-
-// Auth routes (login, signup, logout)
-app.use("/auth", authRoutes);
-
-// Lobby + game routes
-app.use("/lobby", lobbyRoutes);
-app.use("/games", gamesRoutes);
-
-// Existing example routes (optional)
-app.use("/users", userRoutes);
-app.use("/", rootRoutes);
-
-// 404 handler
-app.use((_request, _response, next) => {
-  next(createHttpError(404, "Page not found"));
+app.use((_req, _res, next) => {
+  next(createHttpError(404));
 });
 
 // Error handler middleware (must be last)
-app.use(
-  (
-    err: any,
-    _req: express.Request,
-    res: express.Response,
-    _next: express.NextFunction
-  ) => {
-    const status = err.status || 500;
-    const message = err.message || "Internal Server Error";
+app.use((err: Error, req: express.Request, res: express.Response) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const status = (err as any).status || 500;
+  const message = err.message || "Internal Server Error";
+  const isProduction = process.env.NODE_ENV === "production";
 
-    console.error(`Error ${status}:`, message);
-    if (isDev && err.stack) {
-      console.error(err.stack);
+  // Skip logging browser-generated requests
+  if (!req.url.startsWith("/.well-known/")) {
+    const errorMsg = `${message} (${req.method} ${req.url})`;
+
+    if (isProduction) {
+      // Production: Log to file with full stack, show concise console message
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      logger.error(`${errorMsg} - stack: ${String((err as any)?.stack)}`);
+      console.error(`Error ${status}: ${message} - See logs/error.log for details`);
+    } else {
+      // Development: Log everything to console
+      logger.error(`${errorMsg} - ${String(err)}`);
     }
-
-    // Render your styled error page
-    res.status(status).render("error", { message });
   }
-);
 
-const server = app.listen(PORT, () => {
-  console.log(`Server started on port ${PORT}`);
+  res.status(status).render("error/error", {
+    status,
+    message,
+    stack: isProduction ? null : err.stack,
+  });
 });
 
-server.on("error", (error) => {
-  console.error("Server error:", error);
+const PORT = process.env.PORT || 3000;
+
+httpServer.listen(PORT, () => {
+  logger.info(`Server started on port ${PORT}`);
+});
+
+httpServer.on("error", (error) => {
+  logger.error(`Server error: ${String(error)}`);
 });
