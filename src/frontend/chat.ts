@@ -9,7 +9,7 @@ const input = document.querySelector<HTMLInputElement>("#message-submit input")!
 const button = document.querySelector<HTMLButtonElement>("#message-submit button")!;
 const messageTemplate = document.querySelector<HTMLTemplateElement>("#template-chat-message")!;
 
-const appendMessage = (payload: any) => {
+const appendMessage = (payload: { username: string; created_at: string | Date; message: string }) => {
   const { username, created_at, message } = payload;
 
   const clone = messageTemplate.content.cloneNode(true) as DocumentFragment;

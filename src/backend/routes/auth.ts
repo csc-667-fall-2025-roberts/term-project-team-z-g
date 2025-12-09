@@ -21,6 +21,7 @@ router.post("/signup", async (request, response) => {
   try {
     request.session.user = await Auth.signup(username, email, password);
     response.redirect("/lobby");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (e: any) {
     // Handle database constraint errors
     let errorMessage = "Username or email already exists";

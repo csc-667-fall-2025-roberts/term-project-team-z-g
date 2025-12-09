@@ -34,6 +34,8 @@ body {
 
 #message-listing {
   margin: 16px 0 12px;
+  min-height: 200px;
+  padding: 12px 0;
 }
 
 .chat-message {

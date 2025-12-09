@@ -10,11 +10,13 @@ export default function initSockets(httpServer: HttpServer) {
 
   // attach express-session middleware to engine.io so sockets have access to session
   // engine.io exposes the raw request/response; wrap the middleware
-  // @ts-ignore
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   io.engine.use((req: any, res: any, next: any) => sessionMiddleware(req, res, next));
 
   io.on("connection", (socket) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const req = socket.request as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const session = req.session as { user?: User } | undefined;
 
     if (!session || !session.user) {

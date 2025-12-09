@@ -6,7 +6,7 @@ import { sessionMiddleware } from "./config/session";
 import bodyParser from "body-parser";
 import { configDotenv } from "dotenv";
 import * as routes from "./routes";
-import { requireGuest, requireUser } from "./middleware";
+import { requireUser } from "./middleware";
 import { createServer } from "http";
 import logger from "./lib/logger";
 
@@ -16,12 +16,11 @@ configDotenv();
 const isDevelopment = process.env.NODE_ENV !== "production";
 if (isDevelopment) {
   try {
-    // require optional dev dependency
-     
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const livereload = require("livereload");
     const liveReloadServer = livereload.createServer({ exts: ["ejs", "css", "js"] });
     liveReloadServer.watch([path.join(__dirname, "views"), path.join(__dirname, "public")]);
-  } catch (err) {
+  } catch (_err) {
     logger.warn("livereload not installed; skipping live reload");
   }
 }
@@ -33,25 +32,22 @@ app.set("trust proxy", 1);
 
 // Try to initialize sockets if available (optional)
 try {
-   
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
   const initSockets = require("./sockets").default;
   if (typeof initSockets === "function") {
     app.set("io", initSockets(httpServer));
   }
-} catch (err) {
-  logger.info("Socket initialization skipped (no ./sockets module)");
-  logger.error(String(err));
-}
-
-const PORT = process.env.PORT || 3000;
-
-// Inject livereload script in development (optional)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (_err) {
+    logger.info("Socket initialization skipped (no ./sockets module)");
+    logger.error(String(_err));
+  }// Filter out browser-generated requests from logs
 if (isDevelopment) {
   try {
-     
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const connectLivereload = require("connect-livereload");
     app.use(connectLivereload());
-  } catch (err) {
+  } catch (_err) {
     logger.warn("connect-livereload not installed; skipping injection of livereload script");
   }
 }
@@ -83,13 +79,14 @@ app.use("/lobby", requireUser, routes.lobby);
 app.use("/chat", requireUser, routes.chat);
 //app.use("/games", requireUser, routes.games);
 
-app.use((_request, _response, next) => {
+app.use((_req, _res, next) => {
   next(createHttpError(404));
 });
 
 // Error handler middleware (must be last)
-app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  const status = err.status || 500;
+app.use((err: Error, req: express.Request, res: express.Response) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const status = (err as any).status || 500;
   const message = err.message || "Internal Server Error";
   const isProduction = process.env.NODE_ENV === "production";
 
@@ -99,6 +96,7 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
 
     if (isProduction) {
       // Production: Log to file with full stack, show concise console message
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       logger.error(`${errorMsg} - stack: ${String((err as any)?.stack)}`);
       console.error(`Error ${status}: ${message} - See logs/error.log for details`);
     } else {
@@ -114,7 +112,9 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
   });
 });
 
-const server = httpServer.listen(PORT, () => {
+const PORT = process.env.PORT || 3000;
+
+httpServer.listen(PORT, () => {
   logger.info(`Server started on port ${PORT}`);
 });
 
