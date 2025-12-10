@@ -3,29 +3,69 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="current-user" content="<%= user.username %>" />
-    <title>Lobby</title>
+    <meta name="current-user" content="<%= user?.username || 'User' %>" />
+    <title>Hidden Joker Rummy - Lobby</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/css/main.css" />
     <link rel="stylesheet" href="/css/chat.css" />
     <script src="/js/bundle.js" defer></script>
-    <style>
-    
-    </style>
   </head>
-  <body>
-    <a href="/auth/logout">Logout</a>
-    <h1>
-      Hello
-      <%= user.username %>
-      (<%= user.id %>)
-    </h1>
-    <div id="chat-area">
-      <div id="message-listing"></div>
-      <form id="message-submit">
-        <input type="text" placeholder="Enter your message..." />
-        <button>Send</button>
-      </form>
-    </div>
+  <body class="lobby-page">
+    <nav class="navbar navbar-dark bg-dark shadow-sm">
+      <div class="container d-flex justify-content-between align-items-center">
+        <a class="navbar-brand" href="/lobby">Hidden Joker Rummy</a>
+        <div class="d-flex align-items-center gap-3">
+          <span class="user-chip">Hi, <strong><%= user?.username || 'User' %></strong></span>
+          <a href="/auth/logout" class="btn btn-outline-light btn-sm">Logout</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="main-container">
+      <div class="container text-center mb-4">
+        <div class="welcome-block">
+          <h3 class="welcome-title">Welcome, <%= user?.username || 'Player' %>!</h3>
+          <p class="welcome-sub">Pick a table or start a new one.</p>
+        </div>
+      </div>
+      <div class="container game-grid">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title mb-1">Available Games</h2>
+              <div class="panel-subtitle">Game #, player count, and status</div>
+            </div>
+            <button id="create-game-button" class="btn btn-primary d-flex align-items-center gap-2">
+              <span>Create Game</span>
+            </button>
+          </div>
+          <div id="games-list" class="d-flex flex-column gap-3">
+            <div class="text-center text-muted py-4" id="games-empty">Loading games...</div>
+          </div>
+        </section>
+
+        <section class="panel chat-panel">
+          <div class="panel-header mb-2">
+            <div>
+              <h3 class="panel-title mb-0">Lobby Chat</h3>
+              <div class="panel-subtitle">Coordinate with players before joining.</div>
+            </div>
+          </div>
+          <div id="chat-area">
+            <div id="message-listing"></div>
+            <form id="message-submit">
+              <input type="text" placeholder="Enter your message..." />
+              <button type="submit">Send</button>
+            </form>
+          </div>
+        </section>
+      </div>
+    </main>
+
     <template id="template-chat-message">
       <div class="chat-message">
         <div class="message-header">

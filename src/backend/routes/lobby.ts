@@ -5,7 +5,7 @@ const router = express.Router();
 
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const session: any = (req as any).session;
-  if (!session || !session.userId) {
+  if (!session || !session.user) {
     return res.redirect("/auth/login");
   }
   next();
@@ -22,7 +22,9 @@ router.get("/", requireAuth, async (req, res, next) => {
       hidden_joker_rank: string | null;
     }>("SELECT * FROM games ORDER BY created_at DESC");
 
-    res.render("lobby", { games });
+    const session: any = (req as any).session;
+    // Use the updated lobby template that shows the current user chip
+    res.render("lobby/lobby", { games, user: session?.user });
   } catch (err) {
     next(err);
   }
@@ -45,7 +47,13 @@ router.post("/create-game", requireAuth, async (req, res, next) => {
   try {
     const game = await db.one<{ id: number }>(
       "INSERT INTO games (name, created_by, state, max_players) VALUES ($1, $2, 'waiting', $3) RETURNING id",
-      [name, session.userId, maxPlayersInt]
+      [name, session.user.id, maxPlayersInt]
+    );
+
+    // Auto-join the creator into the game
+    await db.none(
+      `INSERT INTO game_players (game_id, user_id) VALUES ($1, $2) ON CONFLICT (game_id, user_id) DO NOTHING`,
+      [game.id, session.user.id]
     );
 
     // Optionally auto-join the creator into game_players later.

@@ -75,9 +75,8 @@ app.use(sessionMiddleware);
 app.use("/", routes.root);
 app.use("/auth", routes.auth);
 app.use("/lobby", requireUser, routes.lobby);
-// Optional routes (chat/games) not present in all branches
 app.use("/chat", requireUser, routes.chat);
-//app.use("/games", requireUser, routes.games);
+app.use("/games", requireUser, routes.games);
 
 app.use((_req, _res, next) => {
   next(createHttpError(404));

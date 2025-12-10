@@ -3436,13 +3436,83 @@
     credentials: "include"
   });
 
-  // src/frontend/entrypoint.ts
-  var button2 = document.querySelector("#test-button");
-  button2?.addEventListener("click", (event) => {
-    event.preventDefault();
-    setTimeout(() => {
-      alert("You clicked around 1 seconds ago!");
-    }, 1e3);
+  // src/frontend/lobby/load-games.ts
+  async function loadGames() {
+    try {
+      const response = await fetch("/games", {
+        method: "GET",
+        credentials: "include"
+      });
+      if (!response.ok) {
+        throw new Error("Failed to load games");
+      }
+      const games = await response.json();
+      const gamesContainer = document.querySelector("#games-list");
+      if (!gamesContainer) {
+        console.error("Games container not found");
+        return;
+      }
+      gamesContainer.innerHTML = "";
+      if (games.length === 0) {
+        gamesContainer.innerHTML = '<p class="no-games">No games available. Create one!</p>';
+        return;
+      }
+      games.forEach((game) => {
+        const gameElement = document.createElement("div");
+        gameElement.className = "game-item";
+        gameElement.innerHTML = `
+        <div class="game-info">
+          <h3>Game #${game.id}</h3>
+          <p>Status: ${game.status}</p>
+          <p>Players: ${game.player_count || 0}/4</p>
+        </div>
+        <button class="join-game-btn" data-game-id="${game.id}">
+          ${game.status === "waiting" ? "Join Game" : "View Game"}
+        </button>
+      `;
+        const joinButton = gameElement.querySelector(".join-game-btn");
+        if (joinButton) {
+          joinButton.addEventListener("click", () => {
+            window.location.href = `/games/${game.id}`;
+          });
+        }
+        gamesContainer.appendChild(gameElement);
+      });
+    } catch (error) {
+      console.error("Error loading games:", error);
+    }
+  }
+
+  // src/frontend/lobby.ts
+  document.addEventListener("DOMContentLoaded", () => {
+    loadGames();
+    const createGameButton = document.querySelector("#create-game-button");
+    if (createGameButton) {
+      createGameButton.addEventListener("click", async () => {
+        try {
+          const response = await fetch("/games", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            credentials: "include"
+          });
+          if (response.ok) {
+            await loadGames();
+          }
+        } catch (error) {
+          console.error("Error creating game:", error);
+        }
+      });
+    }
   });
+
+  // src/frontend/entrypoint.ts
+  var currentPath = window.location.pathname;
+  if (currentPath === "/lobby") {
+    console.log("Lobby page loaded");
+  } else if (currentPath.startsWith("/games/")) {
+    console.log("Game page loaded");
+  }
 })();
 //# sourceMappingURL=bundle.js.map

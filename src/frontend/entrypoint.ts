@@ -1,11 +1,13 @@
 import "./chat";
+import "./lobby";
 
-const button: Element | null = document.querySelector("#test-button");
+// Initialize based on current page
+const currentPath = window.location.pathname;
 
-button?.addEventListener("click", (event) => {
-    event.preventDefault();
-
-    setTimeout(() => {
-        alert("You clicked around 1 seconds ago!");
-    }, 1000);
-});
+if (currentPath === "/lobby") {
+  // Lobby page logic is handled in lobby.ts
+  console.log("Lobby page loaded");
+} else if (currentPath.startsWith("/games/")) {
+  // Game page logic will be added here
+  console.log("Game page loaded");
+}
