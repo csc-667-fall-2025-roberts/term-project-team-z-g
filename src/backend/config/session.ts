@@ -7,13 +7,12 @@ const pgPool = db.$pool;
 
 export const sessionMiddleware = session({
   store: new PgSession({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     pool: pgPool as any,
     tableName: "session",
   }),
   secret: process.env.SESSION_SECRET || "this should not be used",
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true,
   cookie: {
     maxAge: 1000 * 60 * 60 * 24 * 7,
     httpOnly: true,

@@ -5,6 +5,7 @@ import type { ChatMessageWithUser } from "../backend/types/types";
 const socket = socketIo();
 
 const listing = document.querySelector<HTMLDivElement>("#message-listing")!;
+const form = document.querySelector<HTMLFormElement>("#message-submit")!;
 const input = document.querySelector<HTMLInputElement>("#message-submit input")!;
 const button = document.querySelector<HTMLButtonElement>("#message-submit button")!;
 const messageTemplate = document.querySelector<HTMLTemplateElement>("#template-chat-message")!;
@@ -16,28 +17,32 @@ const appendMessage = (payload: { username: string; created_at: string | Date; m
 
   const timeSpan = clone.querySelector(".message-time");
   const time = new Date(created_at);
-  timeSpan!.textContent = time.toLocaleDateString();
-  console.log(time, timeSpan);
+  timeSpan!.textContent = time.toLocaleTimeString();
 
   const usernameSpan = clone.querySelector(".message-username");
   usernameSpan!.textContent = username;
-  console.log(username, usernameSpan);
 
   const msgSpan = clone.querySelector(".message-text");
   msgSpan!.textContent = message;
-  console.log(message, msgSpan);
 
   listing.appendChild(clone);
+  // Scroll to bottom
+  listing.scrollTop = listing.scrollHeight;
 };
 
+// Load initial messages
 socket.on(chatKeys.CHAT_LISTING, ({ messages }: { messages: ChatMessageWithUser[] }) => {
   console.log(chatKeys.CHAT_LISTING, { messages });
 
+  // Clear placeholder
+  listing.innerHTML = '';
+  
   messages.forEach((message) => {
     appendMessage(message);
   });
 });
 
+// Listen for new messages
 socket.on(
   chatKeys.CHAT_MESSAGE,
   // server emits `{ message: ChatMessage }` but some callers may emit the raw ChatMessage
@@ -45,47 +50,38 @@ socket.on(
     console.log(chatKeys.CHAT_MESSAGE, payload);
 
     // normalize payload: prefer `payload.message` if present
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const msg = (payload as any).message ?? (payload as ChatMessageWithUser);
 
     appendMessage(msg);
   }
 );
 
-const sendMessage = () => {
-  const message = input.value.trim();
+// Handle form submission
+if (form) {
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    if (!input.value.trim()) return;
 
-  if (message.length > 0) {
-    const body = JSON.stringify({ message });
+    try {
+      const response = await fetch("/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: input.value,
+        }),
+      });
 
-    fetch("/chat/", {
-      method: "post",
-      body,
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  }
-
-  input.value = "";
-};
-
-button.addEventListener("click", (event) => {
-  event.preventDefault();
-
-  sendMessage();
-});
-
-input.addEventListener("keydown", (event) => {
-  if (event.key == "Enter") {
-    sendMessage();
-  }
-});
-
-// Load message history when page loads
-fetch("/chat/", {
-  method: "get",
-  credentials: "include",
-});
+      if (response.ok) {
+        input.value = "";
+      } else {
+        console.error("Failed to send message");
+      }
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
+  });
+}
 

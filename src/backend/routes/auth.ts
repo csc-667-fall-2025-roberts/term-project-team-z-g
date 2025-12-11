@@ -20,8 +20,8 @@ router.post("/signup", async (request, response) => {
 
   try {
     request.session.user = await Auth.signup(username, email, password);
+    console.log("Session user set:", request.session.user);
     response.redirect("/lobby");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (e: any) {
     // Handle database constraint errors
     let errorMessage = "Username or email already exists";
@@ -40,12 +40,15 @@ router.post("/signup", async (request, response) => {
 
 router.post("/login", async (request, response) => {
   const { username, password } = request.body;
+  console.log("Login attempt - username:", username, "password:", password ? "***" : "missing");
 
   try {
     request.session.user = await Auth.login(username, password);
+    console.log("Session user set:", request.session.user);
     response.redirect("/lobby");
-  } catch (e) {
-    response.render("auth/login", { local: { error: e } });
+  } catch (e: any) {
+    console.error("Login error:", e.message);
+    response.render("auth/login", { local: { error: e.message } });
   }
 });
 

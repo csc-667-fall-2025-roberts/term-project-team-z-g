@@ -16,7 +16,6 @@ configDotenv();
 const isDevelopment = process.env.NODE_ENV !== "production";
 if (isDevelopment) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const livereload = require("livereload");
     const liveReloadServer = livereload.createServer({ exts: ["ejs", "css", "js"] });
     liveReloadServer.watch([path.join(__dirname, "views"), path.join(__dirname, "public")]);
@@ -32,19 +31,16 @@ app.set("trust proxy", 1);
 
 // Try to initialize sockets if available (optional)
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
   const initSockets = require("./sockets").default;
   if (typeof initSockets === "function") {
     app.set("io", initSockets(httpServer));
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (_err) {
     logger.info("Socket initialization skipped (no ./sockets module)");
     logger.error(String(_err));
   }// Filter out browser-generated requests from logs
 if (isDevelopment) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const connectLivereload = require("connect-livereload");
     app.use(connectLivereload());
   } catch (_err) {
@@ -77,6 +73,7 @@ app.use("/auth", routes.auth);
 app.use("/lobby", requireUser, routes.lobby);
 app.use("/chat", requireUser, routes.chat);
 app.use("/games", requireUser, routes.games);
+app.use("/users", requireUser, routes.users);
 
 app.use((_req, _res, next) => {
   next(createHttpError(404));
@@ -84,7 +81,6 @@ app.use((_req, _res, next) => {
 
 // Error handler middleware (must be last)
 app.use((err: Error, req: express.Request, res: express.Response) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const status = (err as any).status || 500;
   const message = err.message || "Internal Server Error";
   const isProduction = process.env.NODE_ENV === "production";
@@ -95,7 +91,6 @@ app.use((err: Error, req: express.Request, res: express.Response) => {
 
     if (isProduction) {
       // Production: Log to file with full stack, show concise console message
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       logger.error(`${errorMsg} - stack: ${String((err as any)?.stack)}`);
       console.error(`Error ${status}: ${message} - See logs/error.log for details`);
     } else {
@@ -104,11 +99,24 @@ app.use((err: Error, req: express.Request, res: express.Response) => {
     }
   }
 
-  res.status(status).render("error/error", {
-    status,
-    message,
-    stack: isProduction ? null : err.stack,
-  });
+  // Check if this is an API request (returns JSON) or HTML request
+  const isApiRequest = req.url.startsWith('/api/') || req.url.startsWith('/games/') && req.url.includes('/state') || req.accepts(['json', 'html']) === 'json';
+  
+  if (isApiRequest) {
+    // Return JSON for API requests
+    res.status(status).json({
+      error: message,
+      status,
+      ...(isProduction ? {} : { stack: err.stack })
+    });
+  } else {
+    // Return HTML for page requests
+    res.status(status).render("error/error", {
+      status,
+      message,
+      stack: isProduction ? null : err.stack,
+    });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
