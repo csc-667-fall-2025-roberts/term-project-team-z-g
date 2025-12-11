@@ -1,3 +1,4 @@
+import "./game";
 import "./chat";
 import "./lobby";
 

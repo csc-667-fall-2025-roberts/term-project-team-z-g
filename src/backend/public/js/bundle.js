@@ -3084,11 +3084,11 @@
       if (~this._readyState.indexOf("open"))
         return this;
       this.engine = new Socket(this.uri, this.opts);
-      const socket2 = this.engine;
+      const socket3 = this.engine;
       const self2 = this;
       this._readyState = "opening";
       this.skipReconnect = false;
-      const openSubDestroy = on(socket2, "open", function() {
+      const openSubDestroy = on(socket3, "open", function() {
         self2.onopen();
         fn && fn();
       });
@@ -3102,13 +3102,13 @@
           this.maybeReconnectOnOpen();
         }
       };
-      const errorSub = on(socket2, "error", onError);
+      const errorSub = on(socket3, "error", onError);
       if (false !== this._timeout) {
         const timeout = this._timeout;
         const timer = this.setTimeoutFn(() => {
           openSubDestroy();
           onError(new Error("timeout"));
-          socket2.close();
+          socket3.close();
         }, timeout);
         if (this.opts.autoUnref) {
           timer.unref();
@@ -3139,12 +3139,12 @@
       this.cleanup();
       this._readyState = "open";
       this.emitReserved("open");
-      const socket2 = this.engine;
+      const socket3 = this.engine;
       this.subs.push(
-        on(socket2, "ping", this.onping.bind(this)),
-        on(socket2, "data", this.ondata.bind(this)),
-        on(socket2, "error", this.onerror.bind(this)),
-        on(socket2, "close", this.onclose.bind(this)),
+        on(socket3, "ping", this.onping.bind(this)),
+        on(socket3, "data", this.ondata.bind(this)),
+        on(socket3, "error", this.onerror.bind(this)),
+        on(socket3, "close", this.onclose.bind(this)),
         // @ts-ignore
         on(this.decoder, "decoded", this.ondecoded.bind(this))
       );
@@ -3194,14 +3194,14 @@
      * @public
      */
     socket(nsp, opts) {
-      let socket2 = this.nsps[nsp];
-      if (!socket2) {
-        socket2 = new Socket2(this, nsp, opts);
-        this.nsps[nsp] = socket2;
-      } else if (this._autoConnect && !socket2.active) {
-        socket2.connect();
+      let socket3 = this.nsps[nsp];
+      if (!socket3) {
+        socket3 = new Socket2(this, nsp, opts);
+        this.nsps[nsp] = socket3;
+      } else if (this._autoConnect && !socket3.active) {
+        socket3.connect();
       }
-      return socket2;
+      return socket3;
     }
     /**
      * Called upon a socket close.
@@ -3209,11 +3209,11 @@
      * @param socket
      * @private
      */
-    _destroy(socket2) {
+    _destroy(socket3) {
       const nsps = Object.keys(this.nsps);
       for (const nsp of nsps) {
-        const socket3 = this.nsps[nsp];
-        if (socket3.active) {
+        const socket4 = this.nsps[nsp];
+        if (socket4.active) {
           return;
         }
       }
@@ -3367,13 +3367,188 @@
     connect: lookup2
   });
 
+  // src/frontend/game.ts
+  var socket;
+  var gameId;
+  var currentUserId;
+  var gameState;
+  var playerHand = [];
+  function initGameSocket(gId, uId) {
+    gameId = gId;
+    currentUserId = uId;
+    socket = lookup2();
+    socket.on("connect", () => {
+      console.log("Connected to game socket");
+      socket.emit("game:join-room", { gameId });
+      socket.emit("game:request-state", { gameId, userId: currentUserId });
+    });
+    socket.on("game:state-update", (data) => {
+      gameState = data.gameState;
+      if (data.playerHand) {
+        playerHand = data.playerHand;
+      }
+      updateUI();
+    });
+    socket.on("game:card-drawn", (data) => {
+      playerHand = data.playerHand;
+      updatePlayerHand();
+      updateTurnIndicator();
+    });
+    socket.on("game:player-drew", (data) => {
+      console.log(`Player ${data.userId} drew from ${data.source}`);
+      updateOtherPlayers();
+    });
+    socket.on("game:discard-success", (data) => {
+      playerHand = data.playerHand;
+      updatePlayerHand();
+    });
+    socket.on("game:winner", (data) => {
+      gameState = data.gameState;
+      showWinnerModal(data.winnerId);
+      // Auto-redirect to lobby after showing winner
+      setTimeout(() => {
+        window.location.href = "/lobby";
+      }, 6000);
+    });
+
+    // Game restarted by server
+    socket.on("game:restart", (data) => {
+      // Simple handling: reload the page to get fresh state
+      window.location.reload();
+    });
+    socket.on("game:error", (data) => {
+      showError(data.message);
+    });
+    socket.on("disconnect", () => {
+      console.log("Disconnected from game socket");
+    });
+  }
+  function updateUI() {
+    updatePlayerHand();
+    updateOtherPlayers();
+    updateDiscardPile();
+    updateDeckCount();
+    updateTurnIndicator();
+  }
+  function updatePlayerHand() {
+    const handDiv = document.getElementById("player-hand");
+    if (!handDiv) return;
+    if (!playerHand || playerHand.length === 0) {
+      handDiv.innerHTML = '<div class="text-muted">No cards yet</div>';
+      return;
+    }
+    handDiv.innerHTML = playerHand.map(renderCard).join("");
+    handDiv.querySelectorAll(".playing-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        selectCard(card);
+      });
+    });
+  }
+  function updateOtherPlayers() {
+    if (!gameState?.players) return;
+    const container = document.getElementById("other-players");
+    if (!container) return;
+    container.innerHTML = gameState.players.filter((p) => p.player_id !== currentUserId).map((p) => {
+      const isActive = p.player_id === gameState.current_turn_player_id;
+      return `
+        <div class="player-info ${isActive ? "active" : ""}">
+          <strong>${p.username || "Player " + p.player_id}</strong>
+          <div class="small">${p.card_count || 0} cards</div>
+          ${isActive ? '<div class="small text-success">Current Turn</div>' : ""}
+        </div>
+      `;
+    }).join("");
+  }
+  function updateDiscardPile() {
+    if (!gameState?.discard_pile) return;
+    const container = document.getElementById("discard-top-card");
+    if (!container) return;
+    if (gameState.discard_pile.length === 0) {
+      container.innerHTML = '<div class="text-muted">Empty</div>';
+      return;
+    }
+    const topCard = gameState.discard_pile[gameState.discard_pile.length - 1];
+    container.innerHTML = renderCard(topCard);
+  }
+  function updateDeckCount() {
+    const countEl = document.getElementById("deck-count");
+    if (countEl && gameState) {
+      countEl.textContent = String(gameState.deck_count || 0);
+    }
+  }
+  function updateTurnIndicator() {
+    const indicator = document.getElementById("turn-indicator");
+    if (!indicator || !gameState) return;
+    const isMyTurn = gameState.current_turn_player_id === currentUserId;
+    indicator.textContent = isMyTurn ? "It's your turn!" : "Waiting for other player...";
+    indicator.className = isMyTurn ? "small text-success fw-bold ms-3" : "small text-muted ms-3";
+    const deckBtn = document.getElementById("draw-deck-btn");
+    const discardBtn = document.getElementById("draw-discard-btn");
+    if (deckBtn) deckBtn.style.pointerEvents = isMyTurn ? "auto" : "none";
+    if (discardBtn) discardBtn.style.pointerEvents = isMyTurn ? "auto" : "none";
+  }
+  var suitSymbols = {
+    hearts: "\u2665",
+    diamonds: "\u2666",
+    clubs: "\u2663",
+    spades: "\u2660"
+  };
+  function renderCard(card) {
+    const color = card.suit === "hearts" || card.suit === "diamonds" ? "red" : "black";
+    return `
+    <div class="playing-card ${color}" data-card-id="${card.id}">
+      <div class="card-rank">${card.rank}</div>
+      <div class="card-suit">${suitSymbols[card.suit] || card.suit}</div>
+    </div>
+  `;
+  }
+  var selectedCardId = null;
+  function selectCard(cardElement) {
+    document.querySelectorAll(".playing-card").forEach((c) => c.classList.remove("selected"));
+    cardElement.classList.add("selected");
+    selectedCardId = parseInt(cardElement.dataset.cardId || "0");
+    const discardBtn = document.getElementById("discard-btn");
+    if (discardBtn) discardBtn.disabled = false;
+  }
+  function showError(message) {
+    const alert2 = document.getElementById("error-alert");
+    if (!alert2) return;
+    alert2.textContent = message;
+    alert2.style.display = "block";
+    setTimeout(() => {
+      alert2.style.display = "none";
+    }, 5e3);
+  }
+  function showWinnerModal(winnerId) {
+    const isMe = winnerId === currentUserId;
+    const message = isMe ? "Congratulations! You won!" : `Player ${winnerId} won the game!`;
+    alert(message);
+    setTimeout(() => {
+      window.location.href = "/lobby";
+    }, 2e3);
+  }
+  if (typeof window !== "undefined") {
+    window.addEventListener("DOMContentLoaded", () => {
+      const gameIdEl = document.getElementById("game-id");
+      const userIdEl = document.getElementById("user-id");
+      if (gameIdEl && userIdEl) {
+        const gId = parseInt(gameIdEl.textContent || "0");
+        const uId = parseInt(userIdEl.textContent || "0");
+        if (gId && uId) {
+          initGameSocket(gId, uId);
+        }
+      }
+    });
+  }
+
   // src/shared/chat-key.ts
   var CHAT_MESSAGE = `chat:message`;
   var CHAT_LISTING = `chat:listing`;
 
   // src/frontend/chat.ts
-  var socket = lookup2();
+  var socket2 = lookup2();
   var listing = document.querySelector("#message-listing");
+  var form = document.querySelector("#message-submit");
   var input = document.querySelector("#message-submit input");
   var button = document.querySelector("#message-submit button");
   var messageTemplate = document.querySelector("#template-chat-message");
@@ -3382,23 +3557,22 @@
     const clone = messageTemplate.content.cloneNode(true);
     const timeSpan = clone.querySelector(".message-time");
     const time = new Date(created_at);
-    timeSpan.textContent = time.toLocaleDateString();
-    console.log(time, timeSpan);
+    timeSpan.textContent = time.toLocaleTimeString();
     const usernameSpan = clone.querySelector(".message-username");
     usernameSpan.textContent = username;
-    console.log(username, usernameSpan);
     const msgSpan = clone.querySelector(".message-text");
     msgSpan.textContent = message;
-    console.log(message, msgSpan);
     listing.appendChild(clone);
+    listing.scrollTop = listing.scrollHeight;
   };
-  socket.on(CHAT_LISTING, ({ messages }) => {
+  socket2.on(CHAT_LISTING, ({ messages }) => {
     console.log(CHAT_LISTING, { messages });
+    listing.innerHTML = "";
     messages.forEach((message) => {
       appendMessage(message);
     });
   });
-  socket.on(
+  socket2.on(
     CHAT_MESSAGE,
     // server emits `{ message: ChatMessage }` but some callers may emit the raw ChatMessage
     (payload) => {
@@ -3407,34 +3581,30 @@
       appendMessage(msg);
     }
   );
-  var sendMessage = () => {
-    const message = input.value.trim();
-    if (message.length > 0) {
-      const body = JSON.stringify({ message });
-      fetch("/chat/", {
-        method: "post",
-        body,
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json"
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!input.value.trim()) return;
+      try {
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            message: input.value
+          })
+        });
+        if (response.ok) {
+          input.value = "";
+        } else {
+          console.error("Failed to send message");
         }
-      });
-    }
-    input.value = "";
-  };
-  button.addEventListener("click", (event) => {
-    event.preventDefault();
-    sendMessage();
-  });
-  input.addEventListener("keydown", (event) => {
-    if (event.key == "Enter") {
-      sendMessage();
-    }
-  });
-  fetch("/chat/", {
-    method: "get",
-    credentials: "include"
-  });
+      } catch (error) {
+        console.error("Error sending message:", error);
+      }
+    });
+  }
 
   // src/frontend/lobby/load-games.ts
   async function loadGames() {
@@ -3460,20 +3630,68 @@
       games.forEach((game) => {
         const gameElement = document.createElement("div");
         gameElement.className = "game-item";
+        const playerCount = game.player_count || 0;
+        const maxPlayers = game.max_players || 4;
+        const isFull = playerCount >= maxPlayers;
+        const isWaiting = game.state === "waiting";
+        const joinable = isWaiting && !isFull;
+        const userInGame = game.user_in_game || false;
+        let buttonText = "Join Game";
+        let buttonDisabled = !joinable;
+        if (userInGame) {
+          buttonText = "Return to Game";
+          buttonDisabled = false;
+        } else if (isFull) {
+          buttonText = "Game Full";
+        } else if (!isWaiting) {
+          buttonText = "In Progress";
+        }
         gameElement.innerHTML = `
         <div class="game-info">
           <h3>Game #${game.id}</h3>
-          <p>Status: ${game.status}</p>
-          <p>Players: ${game.player_count || 0}/4</p>
+          <p>Status: ${game.state}</p>
+          <p>Players: ${playerCount}/${maxPlayers}</p>
+          ${isFull ? '<p class="game-full-error">Game is full</p>' : ""}
+          ${!isWaiting && !userInGame ? '<p class="game-full-error">Game already started</p>' : ""}
+          <div class="game-error" aria-live="polite"></div>
         </div>
-        <button class="join-game-btn" data-game-id="${game.id}">
-          ${game.status === "waiting" ? "Join Game" : "View Game"}
+        <button class="join-game-btn" data-game-id="${game.id}" ${buttonDisabled ? "disabled" : ""}>
+          ${buttonText}
         </button>
       `;
         const joinButton = gameElement.querySelector(".join-game-btn");
+        const errorEl = gameElement.querySelector(".game-error");
         if (joinButton) {
-          joinButton.addEventListener("click", () => {
-            window.location.href = `/games/${game.id}`;
+          joinButton.addEventListener("click", async () => {
+            if (userInGame) {
+              window.location.href = `/games/${game.id}`;
+              return;
+            }
+            if (!joinable) {
+              if (errorEl) {
+                errorEl.textContent = isFull ? "Game is full." : "Game already started.";
+              }
+              joinButton.disabled = true;
+              joinButton.textContent = isFull ? "Game Full" : "In Progress";
+              return;
+            }
+            try {
+              const resp = await fetch(`/games/${game.id}/join`, {
+                method: "POST",
+                credentials: "include"
+              });
+              if (resp.ok) {
+                window.location.href = `/games/${game.id}`;
+                return;
+              }
+              const data = await resp.json().catch(() => null);
+              const msg = data?.error || "Unable to join this game.";
+              if (errorEl) errorEl.textContent = msg;
+              joinButton.disabled = true;
+              joinButton.textContent = isFull ? "Game Full" : "In Progress";
+            } catch (err) {
+              if (errorEl) errorEl.textContent = "Unable to join this game.";
+            }
           });
         }
         gamesContainer.appendChild(gameElement);
@@ -3490,18 +3708,35 @@
     if (createGameButton) {
       createGameButton.addEventListener("click", async () => {
         try {
+          const gameName = document.querySelector("#game-name")?.value || "New Game";
+          const maxPlayersInput = document.querySelector("#max-players");
+          const maxPlayers = parseInt(maxPlayersInput?.value || "4", 10);
           const response = await fetch("/games", {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
             },
-            credentials: "include"
+            credentials: "include",
+            body: JSON.stringify({
+              name: gameName,
+              max_players: maxPlayers
+            })
           });
           if (response.ok) {
+            if (document.querySelector("#game-name")) {
+              document.querySelector("#game-name").value = "Friday Night Rummy";
+            }
+            if (maxPlayersInput) {
+              maxPlayersInput.value = "4";
+            }
             await loadGames();
+          } else {
+            const error = await response.text();
+            alert("Error creating game: " + error);
           }
         } catch (error) {
           console.error("Error creating game:", error);
+          alert("Failed to create game");
         }
       });
     }

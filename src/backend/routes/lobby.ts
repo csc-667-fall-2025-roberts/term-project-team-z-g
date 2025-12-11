@@ -23,8 +23,29 @@ router.get("/", requireAuth, async (req, res, next) => {
     }>("SELECT * FROM games ORDER BY created_at DESC");
 
     const session: any = (req as any).session;
+    
+    // Check if the current user is in any active games
+    let activeGame = null;
+    if (session?.user) {
+      activeGame = await db.oneOrNone<{
+        id: number;
+        name: string;
+        state: string;
+        player_count: number;
+        max_players: number;
+      }>(
+        `SELECT g.id, g.name, g.state, g.max_players, 
+         (SELECT COUNT(*) FROM game_players WHERE game_id = g.id) as player_count
+         FROM games g 
+         JOIN game_players gp ON g.id = gp.game_id 
+         WHERE gp.user_id = $1 AND g.state IN ('waiting', 'in_progress') 
+         LIMIT 1`,
+        [session.user.id]
+      );
+    }
+    
     // Use the updated lobby template that shows the current user chip
-    res.render("lobby/lobby", { games, user: session?.user });
+    res.render("lobby/lobby", { games, user: session?.user, activeGame });
   } catch (err) {
     next(err);
   }

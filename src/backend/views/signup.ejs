@@ -9,39 +9,42 @@
     />
     <link rel="stylesheet" href="/css/main.css" />
   </head>
-  <body>
+  <body class="auth-page">
     <nav class="navbar navbar-dark bg-dark shadow-sm">
       <div class="container">
         <a class="navbar-brand" href="/">Hidden Joker Rummy</a>
       </div>
     </nav>
 
-    <main class="main-container d-flex justify-content-center align-items-center">
-      <div class="card shadow-lg" style="max-width: 460px; width: 100%;">
-        <div class="card-body">
-          <h1 class="h4 mb-3 text-center">Create an Account</h1>
-          <% if (typeof error !== 'undefined') { %>
-            <div class="alert alert-danger"><%= error %></div>
-          <% } %>
-          <form method="post" action="/auth/signup">
-            <div class="mb-3">
-              <label class="form-label">Username</label>
-              <input type="text" name="username" class="form-control" required />
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Email</label>
-              <input type="email" name="email" class="form-control" required />
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Password</label>
-              <input type="password" name="password" class="form-control" required />
-            </div>
-            <button type="submit" class="btn btn-primary w-100">Sign Up</button>
-          </form>
-          <p class="mt-3 mb-0 text-center">
-            Already have an account?
-            <a href="/auth/login" class="link-light">Log in</a>
-          </p>
+    <main class="auth-shell">
+      <div class="auth-panel">
+        <div class="auth-heading text-center">Sign Up Screen</div>
+        <h1 class="auth-title text-center mb-3">Create Your Account</h1>
+        <% if (typeof error !== 'undefined') { %>
+          <div class="alert alert-danger"><%= error %></div>
+        <% } %>
+        <form method="post" action="/auth/signup" class="stack gap-3">
+          <div class="outline-field">
+            <label for="email" class="outline-label">Email Address</label>
+            <input id="email" type="email" name="email" required />
+          </div>
+          <div class="outline-field">
+            <label for="username" class="outline-label">Username</label>
+            <input id="username" type="text" name="username" required />
+          </div>
+          <div class="outline-field">
+            <label for="password" class="outline-label">Password</label>
+            <input id="password" type="password" name="password" required />
+          </div>
+          <div class="outline-field">
+            <label for="confirm" class="outline-label">Confirm Password</label>
+            <input id="confirm" type="password" name="confirm_password" required />
+          </div>
+          <button type="submit" class="btn-outline">Create Account</button>
+        </form>
+        <div class="auth-footer">
+          <span>Already have account?</span>
+          <a href="/auth/login">Log In</a>
         </div>
       </div>
     </main>

@@ -27,12 +27,26 @@ router.get("/", async (request, response) => {
 router.post("/", async (request, response) => {
   try {
     const { message } = request.body;
-    const { id } = request.session.user!;
+    const session: any = (request as any).session;
+    
+    if (!session || !session.user) {
+      console.error("Chat POST - No user in session");
+      return response.status(401).json({ error: "Not authenticated" });
+    }
+    
+    const { id } = session.user;
+    console.log("Chat POST - Creating message from user", id, "message:", message);
 
     const result = await Chat.create(id, message);
+    console.log("Chat POST - Message created:", result);
     
     const io = request.app.get("io");
-    if (io) io.to(GLOBAL_ROOM).emit(CHAT_MESSAGE, { message: result });
+    if (io) {
+      console.log("Chat POST - Emitting to GLOBAL_ROOM");
+      io.to(GLOBAL_ROOM).emit(CHAT_MESSAGE, { message: result });
+    } else {
+      console.error("Chat POST - No io found");
+    }
 
     response.status(202).send();
   } catch (error) {

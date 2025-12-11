@@ -362,6 +362,12 @@ export class GameLogic {
       [gameId]
     );
 
+    // Game meta (state lives on games table)
+    const gameRow = await db.oneOrNone<{ state: string; hidden_joker_rank: string | null }>(
+      `SELECT state, hidden_joker_rank FROM games WHERE id = $1`,
+      [gameId]
+    );
+
     // Always list joined players, even before cards are dealt
     const players = await db.manyOrNone(
       `SELECT 
@@ -396,10 +402,10 @@ export class GameLogic {
     );
 
     return {
-      state: state?.state ?? 'waiting',
+      state: gameRow?.state ?? 'waiting',
       game_id: gameId,
       current_turn_player_id: state?.current_turn_player_id ?? null,
-      hidden_joker_rank: state?.hidden_joker_rank ?? null,
+      hidden_joker_rank: gameRow?.hidden_joker_rank ?? state?.hidden_joker_rank ?? null,
       winner_id: state?.winner_id ?? null,
       turn_number: state?.turn_number ?? 0,
       players,

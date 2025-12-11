@@ -1,10 +1,10 @@
  export const SIGNUP = `
   INSERT INTO users (username, email, password) 
   VALUES ($1, $2, $3)
-  RETURNING id, username, email
+  RETURNING id, username, email, created_at
 `;
 
 export const LOGIN = `
-  SELECT * FROM users
-  WHERE username=$1
+  SELECT id, username, email, password, created_at FROM users
+  WHERE lower(username) = lower($1) OR lower(email) = lower($1)
 `;

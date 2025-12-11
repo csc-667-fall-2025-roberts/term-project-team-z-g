@@ -29,28 +29,43 @@
     </nav>
 
     <main class="main-container">
-      <div class="container text-center mb-4">
-        <div class="welcome-block">
-          <h3 class="welcome-title">Welcome, <%= user?.username || 'Player' %>!</h3>
-          <p class="welcome-sub">Pick a table or start a new one.</p>
-        </div>
-      </div>
-      <div class="container game-grid">
-        <section class="panel">
-          <div class="panel-header">
-            <div>
-              <h2 class="panel-title mb-1">Available Games</h2>
-              <div class="panel-subtitle">Game #, player count, and status</div>
+      <div class="container lobby-wrapper">
+        <div class="left-column">
+          <!-- Create Game Section -->
+          <section class="panel create-panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title mb-1">Create Game</h2>
+              </div>
             </div>
-            <button id="create-game-button" class="btn btn-primary d-flex align-items-center gap-2">
-              <span>Create Game</span>
-            </button>
-          </div>
-          <div id="games-list" class="d-flex flex-column gap-3">
-            <div class="text-center text-muted py-4" id="games-empty">Loading games...</div>
-          </div>
-        </section>
+            <div class="create-form-wrapper">
+              <div class="form-group">
+                <label for="game-name" class="form-label">Game Name</label>
+                <input type="text" id="game-name" class="form-control" placeholder="Friday Night Rummy" />
+              </div>
+              <div class="form-group">
+                <label for="max-players" class="form-label">Max Players</label>
+                <input type="number" id="max-players" class="form-control" value="4" min="2" max="6" />
+              </div>
+              <button id="create-game-button" class="btn btn-primary btn-create w-100">Create</button>
+            </div>
+          </section>
 
+          <!-- Available Games Section -->
+          <section class="panel games-panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title mb-1">Available Games</h2>
+                <div class="panel-subtitle">Game #, player count, and status</div>
+              </div>
+            </div>
+            <div id="games-list" class="d-flex flex-column gap-3">
+              <div class="text-center text-muted py-4" id="games-empty">No games yet. Create one to get started!</div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Chat Section (Right Column) -->
         <section class="panel chat-panel">
           <div class="panel-header mb-2">
             <div>
@@ -61,7 +76,7 @@
           <div id="chat-area">
             <div id="message-listing"></div>
             <form id="message-submit">
-              <input type="text" placeholder="Enter your message..." />
+              <input type="text" placeholder="Type a message..." />
               <button type="submit">Send</button>
             </form>
           </div>

@@ -20,3 +20,15 @@ export interface ChatMessageWithUser extends ChatMessage {
     username: string;
     email: string;
 }
+
+export interface Game {
+  id: number;
+  name: string;
+  created_by: number;
+  state: string;
+  max_players: number;
+  hidden_joker_rank?: string;
+  created_at: Date;
+  player_count?: number;
+  players?: Array<{ user_id: number; username: string; email: string }>; 
+}

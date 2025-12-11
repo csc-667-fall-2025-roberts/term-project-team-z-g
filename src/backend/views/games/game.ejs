@@ -3,77 +3,870 @@
   <head>
     <meta charset="UTF-8" />
     <title>Game #<%= game.id %> – Hidden Joker Rummy</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="/css/main.css" />
+    <style>
+      .playing-card {
+        width: 80px;
+        height: 112px;
+        border: 2px solid #333;
+        border-radius: 8px;
+        padding: 8px;
+        margin: 4px;
+        display: inline-block;
+        background: white;
+        cursor: grab;
+        transition: transform 0.2s, box-shadow 0.2s;
+        user-select: none;
+      }
+      .playing-card:active {
+        cursor: grabbing;
+      }
+      .playing-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      }
+      .playing-card.selected {
+        transform: translateY(-15px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+        border-color: #ffc107;
+      }
+      .playing-card.dragging {
+        opacity: 0.5;
+      }
+      .playing-card.red { color: #dc3545; }
+      .playing-card.black { color: #212529; }
+      .card-rank { font-size: 1.2rem; font-weight: bold; }
+      .card-suit { font-size: 1.5rem; }
+      .card-back {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .game-center {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        margin: 30px 0;
+      }
+      .deck-area {
+        width: 100px;
+        height: 140px;
+        border: 3px dashed #6c757d;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .deck-area:hover {
+        border-color: #0d6efd;
+        background: rgba(13, 110, 253, 0.1);
+      }
+      .player-hand {
+        min-height: 140px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 10px;
+      }
+      .other-players {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+      .player-info {
+        padding: 10px 20px;
+        background: white;
+        border-radius: 8px;
+        border: 2px solid #dee2e6;
+      }
+      .player-info.active {
+        border-color: #198754;
+        background: #d1e7dd;
+      }
+      .results-image {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        border: 2px solid #dee2e6;
+      }
+      /* Results modal styling */
+      .modal-backdrop.show { opacity: 0.5; }
+      .results-card {
+        background: #fdfbf6;
+        border: 2px solid #2b3a67;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+      }
+      .results-title { color: #2b3a67; font-weight: 700; }
+      .results-winner { color: #5c3ba0; font-weight: 700; font-size: 1.35rem; }
+      .results-joker { background: #e0f7f1; border: 2px solid #1aa68a; border-radius: 10px; padding: 10px 14px; display: inline-block; font-weight: 600; }
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="/js/bundle.js"></script>
+      .results-list { border: 2px solid #d33; border-radius: 10px; padding: 10px 14px; background: #fff; }
+      .results-list + .results-list { margin-top: 10px; }
+      .results-buttons .btn { min-width: 140px; }
+    </style>
   </head>
   <body>
     <nav class="navbar navbar-dark bg-dark shadow-sm">
       <div class="container d-flex justify-content-between align-items-center">
         <a class="navbar-brand" href="/lobby">Hidden Joker Rummy</a>
-        <a href="/lobby" class="btn btn-outline-light btn-sm">Back to Lobby</a>
+        <div class="d-flex align-items-center gap-3">
+          <span class="text-light small">Hi, <strong><%= currentUser?.username %></strong></span>
+          <a href="/lobby" class="btn btn-outline-light btn-sm">Back to Lobby</a>
+          <a href="/auth/logout" class="btn btn-outline-light btn-sm">Logout</a>
+        </div>
       </div>
     </nav>
 
     <main class="main-container">
       <div class="container">
-        <!-- Top game info card -->
-        <div class="card mb-3 shadow hoverable">
+        <div class="card mb-3 shadow">
           <div class="card-body d-flex justify-content-between align-items-center">
             <div>
               <h1 class="h5 mb-1"><%= game.name %></h1>
-              <div class="small text-muted">
-                Game ID: <%= game.id %> · State: <%= game.state %> · Max Players: <%= game.max_players %>
-              </div>
+              <div class="small text-muted">Game ID: <%= game.id %> · State: <span id="game-state"><%= game.state %></span></div>
             </div>
-            <div class="small text-muted text-end">
-              Hidden Joker Rank:
-              <strong><%= game.hidden_joker_rank || 'TBD' %></strong>
+            <div class="d-flex gap-2">
+              <% if (game.state === 'waiting') { %>
+                <button id="start-game" class="btn btn-success">Start Game</button>
+              <% } %>
+              <button id="declare-btn" class="btn btn-outline-warning" style="display: none;">End Game</button>
             </div>
           </div>
         </div>
 
-        <!-- Game board layout -->
-        <div class="game-board shadow mb-3">
-          <div class="row g-3">
-            <!-- Center: discard + deck -->
-            <div class="col-12 text-center mb-3">
-              <div class="game-zone-title">Table Center</div>
-              <p class="mb-1 small text-muted">Discard pile & draw deck will be here.</p>
-              <div class="game-center-row mt-2">
-                <div class="card px-3 py-2 bg-dark border-secondary">
-                  <div class="small text-muted text-center">Discard Pile</div>
-                </div>
-                <div class="card px-3 py-2 bg-dark border-secondary">
-                  <div class="small text-muted text-center">Draw Deck</div>
-                </div>
+        <div class="other-players" id="other-players"></div>
+
+        <div class="game-center">
+          <div class="deck-area" id="draw-deck-btn">
+            <div class="text-center">
+              <div class="card-back playing-card">🎴</div>
+              <div class="small mt-2">Draw Deck</div>
+              <div class="small text-muted" id="deck-count">52</div>
+            </div>
+          </div>
+          <div class="deck-area" id="draw-discard-btn">
+            <div class="text-center">
+              <div id="discard-top-card">
+                <div class="text-muted">Discard Pile</div>
+                <div class="small text-muted">Empty</div>
               </div>
             </div>
+          </div>
+        </div>
 
-            <!-- Your hand -->
-            <div class="col-12">
-              <div class="game-zone-title">Your Hand</div>
-              <div class="game-hand-area mt-2">
-                <span class="text-muted small">
-                  Your cards will be rendered here as interactive elements.
-                </span>
-              </div>
+        <div class="player-hand">
+          <h5>Your Hand</h5>
+          <div id="player-hand" class="d-flex flex-wrap"></div>
+          <div class="mt-3">
+            <button id="lay-down-set-btn" class="btn btn-success me-2">Lay Down Set</button>
+            <button id="discard-btn" class="btn btn-primary" disabled>Discard Selected Card</button>
+            <span class="small text-muted ms-3" id="turn-indicator"></span>
+          </div>
+          <div id="meld-message" class="mt-2 small"></div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-body">
+            <h5 class="h6 mb-2">Your Laid Sets</h5>
+            <div id="laid-sets" class="d-flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+
+        <div id="error-alert" class="alert alert-danger mt-3" style="display: none;"></div>
+        <div id="finished-banner" class="alert alert-success mt-3" style="display: none;">
+          <div class="d-flex flex-column gap-2">
+            <span id="finished-text">Game over!</span>
+            <img id="results-img" class="results-image" src="/images/IMG_1340.jpeg" alt="Game results" onerror="this.style.display='none'" />
+            <div>
+              <button id="finished-back-btn" class="btn btn-outline-light btn-sm">Back to Lobby Now</button>
             </div>
+          </div>
+        </div>
 
-            <!-- Other players -->
-            <div class="col-12">
-              <div class="game-zone-title">Other Players</div>
-              <div class="mt-2 d-flex flex-wrap gap-2">
-                <div class="player-pill">Player 2 · 10 cards</div>
-                <div class="player-pill">Player 3 · 10 cards</div>
-                <div class="player-pill">Player 4 · 10 cards</div>
+        <!-- Results Modal -->
+        <div class="modal fade" id="results-modal" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content results-card p-3">
+              <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title results-title">Game Results</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <div class="results-winner" id="results-winner-text">Player Wins!</div>
+                <div class="results-joker mt-2" id="results-joker-text" style="display:none;">Hidden Joker Revealed: <span class="results-rank" id="results-joker-rank"></span></div>
+                <div class="mt-3" id="results-scores"></div>
+              </div>
+              <div class="modal-footer border-0 results-buttons d-flex justify-content-between w-100">
+                <button type="button" class="btn btn-outline-primary" id="results-play-again">Play Again</button>
+                <button type="button" class="btn btn-primary" id="results-to-lobby">Return to Lobby</button>
               </div>
             </div>
           </div>
         </div>
       </div>
     </main>
+
+    <script>
+      const gameId = <%= game.id %>;
+      const currentUserId = <%= currentUser?.id ? currentUser.id : 'null' %>;
+      let selectedCardId = null;
+      let selectedCardsForSet = []; // Track multiple cards for set laying
+      let gameState = null;
+      let playerCards = [];
+      let cardOrder = []; // Track custom card order by card ID
+      let resultsModal = null;
+
+      async function loadGameState() {
+        try {
+          const res = await fetch(`/games/${gameId}/state`, { cache: 'no-store' });
+          const text = await res.text();
+
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${text}`);
+          }
+
+          if (!text || !text.trim()) {
+            throw new Error('Empty response from server');
+          }
+
+          console.log('Raw response:', text);
+          const data = JSON.parse(text);
+          console.log('Parsed response:', data);
+
+          gameState = data.gameState;
+          const newCards = data.playerHand || [];
+          
+          // Preserve custom card order if it exists
+          if (cardOrder.length > 0 && newCards.length === playerCards.length) {
+            // Reorder new cards based on saved order
+            const cardMap = new Map(newCards.map(card => [card.id, card]));
+            playerCards = cardOrder.map(id => cardMap.get(id)).filter(card => card !== undefined);
+            
+            // Add any new cards that weren't in the previous order
+            newCards.forEach(card => {
+              if (!cardOrder.includes(card.id)) {
+                playerCards.push(card);
+              }
+            });
+          } else {
+            // First load or card count changed, use server order
+            playerCards = newCards;
+          }
+          
+          // Update card order tracking
+          cardOrder = playerCards.map(card => card.id);
+
+          window.lastStateAllCards = [...(data.playerHand || []), ...(data.myLaidCards || [])];
+          updateGameDisplay();
+        } catch (err) {
+          console.error('Error loading game state:', err);
+          showError('Failed to load game state: ' + err.message);
+        }
+      }
+
+      function updateGameDisplay() {
+        if (!gameState) return;
+        
+        document.getElementById('game-state').textContent = gameState.state || 'unknown';
+        
+        renderOtherPlayers();
+        renderPlayerHand();
+        renderDeck();
+        renderDiscardPile();
+        updateTurnIndicator();
+        renderLaidSets();
+        updateFinishedState();
+        checkForWinner();
+      }
+
+      function checkForWinner() {
+        // Detect winner via gameState.winner_id (backend now provides it)
+        const winnerId = gameState.winner_id || null;
+        if (winnerId && !hasWinner) {
+          hasWinner = true;
+          const btn = document.getElementById('declare-btn');
+          if (btn) {
+            btn.style.display = 'inline-block';
+          }
+          // Auto-end the game 2 seconds after winner is detected
+          setTimeout(() => {
+            declareWinner();
+          }, 2000);
+        }
+      }
+
+      function renderLaidSets() {
+        const container = document.getElementById('laid-sets');
+        if (!container) return;
+        container.innerHTML = '';
+        const me = gameState.players?.find(p => p.player_id === currentUserId);
+        const melds = Array.isArray(me?.melds) ? me.melds : (me?.melds ? JSON.parse(me.melds) : []);
+        const laidMap = new Map((window.lastStateAllCards || []).map(c => [c.id, c]));
+
+        for (const meld of melds) {
+          const group = document.createElement('div');
+          group.className = 'd-flex align-items-center gap-1 p-2 border rounded bg-white';
+          for (const cardId of meld) {
+            const c = laidMap.get(cardId);
+            if (!c) continue;
+            const div = document.createElement('div');
+            div.className = `playing-card ${getSuitColor(c.suit)}`;
+            div.innerHTML = `<div class="card-rank">${c.rank}</div><div class="card-suit">${getSuitSymbol(c.suit)}</div>`;
+            group.appendChild(div);
+          }
+          container.appendChild(group);
+        }
+      }
+
+      function renderOtherPlayers() {
+        const container = document.getElementById('other-players');
+        container.innerHTML = '';
+        
+        if (!gameState.players || !Array.isArray(gameState.players)) {
+          console.warn('No players data:', gameState.players);
+          return;
+        }
+        
+        gameState.players.forEach(player => {
+          const div = document.createElement('div');
+          div.className = 'player-info';
+          if (player.player_id === gameState.current_turn_player_id) {
+            div.classList.add('active');
+          }
+          
+          const isCurrentUser = player.player_id === currentUserId;
+          const userLabel = isCurrentUser ? ' (You)' : '';
+          
+          div.innerHTML = `
+            <div class="fw-bold">${player.username}${userLabel}</div>
+            <div class="small text-muted">${player.card_count || 0} cards</div>
+          `;
+          container.appendChild(div);
+        });
+        
+        console.log('Rendered players:', gameState.players, 'currentUserId:', currentUserId);
+      }
+
+      function renderPlayerHand() {
+        const container = document.getElementById('player-hand');
+        container.innerHTML = '';
+        
+        if (!playerCards || playerCards.length === 0) {
+          container.innerHTML = '<div class="text-muted">No cards yet</div>';
+          return;
+        }
+        
+        playerCards.forEach((card, index) => {
+          const cardDiv = createCardElement(card, index);
+          container.appendChild(cardDiv);
+        });
+      }
+
+      function createCardElement(card, index) {
+        const div = document.createElement('div');
+        div.className = `playing-card ${getSuitColor(card.suit)}`;
+        div.id = `card-${card.id}`;
+        div.draggable = true;
+        div.dataset.cardIndex = index;
+        div.dataset.cardId = card.id;
+        
+        let isDragging = false;
+        
+        // Drag events
+        div.addEventListener('dragstart', function(e) {
+          isDragging = true;
+          handleDragStart.call(this, e);
+        });
+        div.addEventListener('dragover', handleDragOver);
+        div.addEventListener('drop', handleDrop);
+        div.addEventListener('dragend', function(e) {
+          handleDragEnd.call(this, e);
+          setTimeout(() => { isDragging = false; }, 100);
+        });
+        
+        // Click event for selection (only if not dragging)
+        div.addEventListener('click', function(e) {
+          if (!isDragging) {
+            selectCard(card.id, this, e);
+          }
+        });
+        
+        const suitSymbol = getSuitSymbol(card.suit);
+        div.innerHTML = `
+          <div>
+            <div class="card-rank">${card.rank}</div>
+            <div class="card-suit">${suitSymbol}</div>
+          </div>
+        `;
+        return div;
+      }
+
+      let draggedCard = null;
+      let hasWinner = false;
+
+      function handleDragStart(e) {
+        draggedCard = this;
+        this.style.opacity = '0.5';
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', this.innerHTML);
+      }
+
+      function handleDragOver(e) {
+        if (e.preventDefault) {
+          e.preventDefault();
+        }
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+      }
+
+      function handleDrop(e) {
+        if (e.stopPropagation) {
+          e.stopPropagation();
+        }
+        if (e.preventDefault) {
+          e.preventDefault();
+        }
+
+        if (draggedCard && draggedCard !== this) {
+          const fromIndex = parseInt(draggedCard.dataset.cardIndex);
+          const toIndex = parseInt(this.dataset.cardIndex);
+          
+          // Rearrange cards array
+          const [movedCard] = playerCards.splice(fromIndex, 1);
+          playerCards.splice(toIndex, 0, movedCard);
+          
+          // Update card order tracking
+          cardOrder = playerCards.map(card => card.id);
+          
+          // Persist card order to database
+          const cardIds = playerCards.map(card => card.id);
+          fetch(`/games/<%= game.id %>/arrange-hand`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cardIds })
+          }).catch(err => console.error('Failed to save card order:', err));
+          
+          // Save selected card ID before re-render
+          const selectedId = selectedCardId;
+          
+          // Re-render hand
+          renderPlayerHand();
+          
+          // Restore selection
+          if (selectedId) {
+            const selectedElement = document.getElementById(`card-${selectedId}`);
+            if (selectedElement) {
+              selectedElement.classList.add('selected');
+            }
+          }
+        }
+        
+        return false;
+      }
+
+      function handleDragEnd(e) {
+        this.style.opacity = '1';
+        draggedCard = null;
+      }
+
+      function getSuitColor(suit) {
+        return (suit === 'hearts' || suit === 'diamonds') ? 'red' : 'black';
+      }
+
+      function getSuitSymbol(suit) {
+        const symbols = {
+          hearts: '♥',
+          diamonds: '♦',
+          clubs: '♣',
+          spades: '♠'
+        };
+        return symbols[suit] || '?';
+      }
+
+      function selectCard(cardId, element, evt) {
+        // Shift key allows multiple selection for sets
+        if (evt && evt.shiftKey) {
+          if (selectedCardsForSet.includes(cardId)) {
+            selectedCardsForSet = selectedCardsForSet.filter(id => id !== cardId);
+            element.classList.remove('selected');
+          } else {
+            selectedCardsForSet.push(cardId);
+            element.classList.add('selected');
+          }
+          updateSetButton();
+        } else {
+          // Single selection for discard
+          if (selectedCardId === cardId) {
+            selectedCardId = null;
+            element.classList.remove('selected');
+          } else {
+            document.querySelectorAll('.playing-card.selected').forEach(el => {
+              if (!selectedCardsForSet.includes(parseInt(el.id.replace('card-', '')))) {
+                el.classList.remove('selected');
+              }
+            });
+            selectedCardId = cardId;
+            element.classList.add('selected');
+          }
+          document.getElementById('discard-btn').disabled = selectedCardId === null;
+        }
+      }
+
+      function updateSetButton() {
+        const btn = document.getElementById('lay-down-set-btn');
+        if (selectedCardsForSet.length >= 3) {
+          btn.disabled = false;
+          btn.textContent = `Lay Down Set (${selectedCardsForSet.length} cards)`;
+        } else {
+          btn.disabled = true;
+          btn.textContent = 'Lay Down Set';
+        }
+      }
+
+      function renderDeck() {
+        const count = gameState.deck_count || 0;
+        document.getElementById('deck-count').textContent = count;
+      }
+
+      function renderDiscardPile() {
+        const container = document.getElementById('discard-top-card');
+        if (!gameState.discard_pile || gameState.discard_pile.length === 0) {
+          container.innerHTML = `
+            <div class="text-muted">Discard Pile</div>
+            <div class="small text-muted">Empty</div>
+          `;
+        } else {
+          const topCard = gameState.discard_pile[0];
+          container.innerHTML = createCardElement(topCard).outerHTML;
+        }
+      }
+
+      function updateTurnIndicator() {
+        const indicator = document.getElementById('turn-indicator');
+        if (gameState.state !== 'in_progress') {
+          indicator.textContent = '';
+          return;
+        }
+        
+        if (gameState.current_turn_player_id === currentUserId) {
+          indicator.textContent = "✓ It's your turn!";
+          indicator.className = 'small text-success ms-3';
+        } else {
+          const currentPlayer = gameState.players?.find(p => p.player_id === gameState.current_turn_player_id);
+          const playerName = currentPlayer?.username || 'Someone';
+          indicator.textContent = `Waiting for ${playerName}...`;
+          indicator.className = 'small text-muted ms-3';
+        }
+      }
+
+      async function startGame() {
+        console.log('Start game clicked, gameId:', gameId);
+        try {
+          const res = await fetch(`/games/${gameId}/start`, { 
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin'
+          });
+          console.log('Response status:', res.status);
+          
+          // Check if response is JSON
+          const contentType = res.headers.get('content-type');
+          console.log('Content-Type:', contentType);
+          
+          if (!contentType || !contentType.includes('application/json')) {
+            const text = await res.text();
+            console.error('Non-JSON response:', text.substring(0, 200));
+            throw new Error('Server returned HTML instead of JSON');
+          }
+          
+          const data = await res.json();
+          console.log('Response data:', data);
+          
+          if (res.ok) {
+            showError('Game started successfully!');
+            await loadGameState();
+          } else {
+            showError(data.error || 'Failed to start game');
+          }
+        } catch (err) {
+          console.error('Start game error:', err);
+          showError('Error: ' + err.message);
+        }
+      }
+
+      async function drawFromDeck() {
+        try {
+          const res = await fetch(`/games/${gameId}/draw-deck`, { method: 'POST' });
+          const data = await res.json();
+          
+          if (res.ok) {
+            await loadGameState();
+          } else {
+            showError(data.error || 'Failed to draw from deck');
+          }
+        } catch (err) {
+          showError('Error: ' + err.message);
+        }
+      }
+
+      async function drawFromDiscard() {
+        try {
+          const res = await fetch(`/games/${gameId}/draw-discard`, { method: 'POST' });
+          const data = await res.json();
+          
+          if (res.ok) {
+            await loadGameState();
+          } else {
+            showError(data.error || 'Failed to draw from discard');
+          }
+        } catch (err) {
+          showError('Error: ' + err.message);
+        }
+      }
+
+      async function discardCard() {
+        if (!selectedCardId) {
+          showError('Please select a card to discard');
+          return;
+        }
+        
+        try {
+          const res = await fetch(`/games/${gameId}/discard`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cardId: selectedCardId })
+          });
+          const data = await res.json();
+          
+          if (res.ok) {
+            selectedCardId = null;
+            if (data.won) {
+              showMeldMessage('🎉 You won! All cards melded!', 'success');
+              showFinishedBanner('You won! Game over.');
+              disableAllActions();
+            } else {
+              await loadGameState();
+            }
+          } else {
+            showError(data.error || 'Failed to discard card');
+          }
+        } catch (err) {
+          showError('Error: ' + err.message);
+        }
+      }
+
+      async function declareWinner() {
+        try {
+          const res = await fetch(`/games/${gameId}/declare`, { method: 'POST' });
+          const data = await res.json();
+          
+          if (res.ok) {
+            showFinishedBanner('Game finished.');
+            disableAllActions();
+          } else {
+            showError(data.error || 'Failed to declare winner');
+          }
+        } catch (err) {
+          showError('Error: ' + err.message);
+        }
+      }
+
+      function confirmEndGame() {
+        const ok = window.confirm('End this game for all players? This cannot be undone.');
+        if (!ok) return;
+        const btn = document.getElementById('declare-btn');
+        if (btn) btn.disabled = true;
+        declareWinner();
+      }
+
+      async function layDownSet() {
+        if (selectedCardsForSet.length < 3) {
+          showMeldMessage('Please select at least 3 cards to form a set', 'error');
+          return;
+        }
+
+        // Get the selected cards
+        const setCards = playerCards.filter(card => selectedCardsForSet.includes(card.id));
+        
+        // Validate it's a valid set (same rank, different suits)
+        if (!validateSet(setCards)) {
+          showMeldMessage('Invalid set! Cards must be the same rank with different suits', 'error');
+          return;
+        }
+
+        try {
+          const res = await fetch(`/games/${gameId}/lay-set`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cardIds: selectedCardsForSet })
+          });
+          
+          const data = await res.json();
+          
+          if (res.ok) {
+            if (data.won) {
+              showMeldMessage('🎉 You won! All cards melded!', 'success');
+              selectedCardsForSet = [];
+              updateSetButton();
+              showFinishedBanner('You won! Game over.');
+              disableAllActions();
+            } else {
+              showMeldMessage('Set laid down successfully!', 'success');
+              selectedCardsForSet = [];
+              updateSetButton();
+              await loadGameState();
+            }
+          } else {
+            showMeldMessage(data.error || 'Failed to lay down set', 'error');
+          }
+        } catch (err) {
+          showMeldMessage('Error: ' + err.message, 'error');
+        }
+      }
+
+      function validateSet(cards) {
+        if (cards.length < 3) return false;
+        
+        // Check all cards have the same rank
+        const ranks = new Set(cards.map(c => c.rank));
+        if (ranks.size !== 1) return false;
+        
+        // Check all cards have different suits
+        const suits = new Set(cards.map(c => c.suit));
+        return suits.size === cards.length;
+      }
+
+      function showMeldMessage(msg, type) {
+        const msgEl = document.getElementById('meld-message');
+        msgEl.textContent = msg;
+        msgEl.className = `mt-2 small ${type === 'error' ? 'text-danger' : 'text-success'}`;
+        setTimeout(() => { msgEl.textContent = ''; }, 5000);
+      }
+
+      function showError(msg) {
+        const alert = document.getElementById('error-alert');
+        alert.textContent = msg;
+        alert.style.display = 'block';
+        setTimeout(() => { alert.style.display = 'none'; }, 5000);
+      }
+
+      let finishedRedirectTimer = null;
+      function showFinishedBanner(text) {
+        const banner = document.getElementById('finished-banner');
+        const label = document.getElementById('finished-text');
+        label.textContent = text || 'Game over!';
+        banner.style.display = 'block';
+        // Keep banner, but rely on modal CTA for navigation
+      }
+
+      document.getElementById('finished-back-btn')?.addEventListener('click', () => {
+        window.location.href = '/lobby';
+      });
+
+      function showResultsModal({ winnerName = 'Player', hiddenJokerRank = null, scores = [] }) {
+        // If bootstrap JS failed to load, skip modal to avoid throwing
+        if (!window.bootstrap || !window.bootstrap.Modal) {
+          showError('Bootstrap JS is missing; results modal skipped.');
+          return;
+        }
+
+        if (!resultsModal) {
+          const modalEl = document.getElementById('results-modal');
+          resultsModal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+          document.getElementById('results-play-again').addEventListener('click', () => window.location.reload());
+          document.getElementById('results-to-lobby').addEventListener('click', () => window.location.href = '/lobby');
+        }
+
+        const winnerEl = document.getElementById('results-winner-text');
+        winnerEl.textContent = `${winnerName} Wins!`;
+
+        const jokerEl = document.getElementById('results-joker-text');
+        const jokerRankEl = document.getElementById('results-joker-rank');
+        if (hiddenJokerRank) {
+          jokerEl.style.display = 'inline-block';
+          jokerRankEl.textContent = hiddenJokerRank;
+        } else {
+          jokerEl.style.display = 'none';
+        }
+
+        const scoresEl = document.getElementById('results-scores');
+        scoresEl.innerHTML = '';
+        scores.forEach((s, idx) => {
+          const div = document.createElement('div');
+          div.className = 'results-list';
+          const place = idx + 1;
+          const suffix = place === 1 ? 'st' : place === 2 ? 'nd' : place === 3 ? 'rd' : 'th';
+          const winnerTag = idx === 0 ? ' (Winner!)' : '';
+          div.textContent = `${place}${suffix} - ${s.name}: ${s.points} points${winnerTag}`;
+          scoresEl.appendChild(div);
+        });
+
+        resultsModal.show();
+
+        // Auto-redirect everyone to lobby after 6s if they don't click
+        setTimeout(() => {
+          window.location.href = '/lobby';
+        }, 6000);
+      }
+
+      function disableAllActions() {
+        document.getElementById('draw-deck-btn').style.pointerEvents = 'none';
+        document.getElementById('draw-discard-btn').style.pointerEvents = 'none';
+        const discardBtn = document.getElementById('discard-btn');
+        const layBtn = document.getElementById('lay-down-set-btn');
+        discardBtn.disabled = true;
+        layBtn.disabled = true;
+      }
+
+      function updateFinishedState() {
+        if (gameState.state === 'finished') {
+          const winnerId = gameState.winner_id || null;
+          const winner = winnerId ? (gameState.players || []).find(p => p.player_id === winnerId) : null;
+          const name = winner?.username ? `${winner.username} Wins!` : 'Game over!';
+          showFinishedBanner(name);
+          disableAllActions();
+
+          // Build scores array (sorted by card_count as placeholder since scoring not provided)
+          const scores = (gameState.players || []).map(p => ({ name: p.username, points: Number(p.card_count) || 0 }))
+            .sort((a, b) => a.points - b.points);
+
+          const hiddenJokerRank = gameState.hidden_joker_rank || null;
+          showResultsModal({ winnerName: winner?.username || 'Player', hiddenJokerRank, scores });
+          // If no bootstrap modal (guarded above), still redirect after delay to lobby
+          if (!window.bootstrap || !window.bootstrap.Modal) {
+            setTimeout(() => { window.location.href = '/lobby'; }, 6000);
+          }
+        }
+      }
+
+      // Set up event listeners AFTER functions are defined
+      const startBtn = document.getElementById('start-game');
+      console.log('Start button element:', startBtn);
+      startBtn?.addEventListener('click', () => {
+        console.log('Start button clicked!');
+        startGame();
+      });
+      document.getElementById('draw-deck-btn').addEventListener('click', drawFromDeck);
+      document.getElementById('draw-discard-btn').addEventListener('click', drawFromDiscard);
+      document.getElementById('discard-btn').addEventListener('click', discardCard);
+      document.getElementById('lay-down-set-btn').addEventListener('click', layDownSet);
+      document.getElementById('declare-btn')?.addEventListener('click', confirmEndGame);
+
+      // Load initial state and set up polling
+      loadGameState();
+      setInterval(loadGameState, 2000);
+      
+      // Initialize button states
+      updateSetButton();
+    </script>
   </body>
 </html>

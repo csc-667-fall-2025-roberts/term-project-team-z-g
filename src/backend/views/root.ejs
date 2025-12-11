@@ -3,69 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-    .container {
-      text-align: center;
-      background: white;
-      padding: 60px 40px;
-      border-radius: 12px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-    }
-    h1 {
-      color: #333;
-      font-size: 48px;
-      margin: 0 0 30px 0;
-    }
-    .links {
-      display: flex;
-      gap: 20px;
-      justify-content: center;
-    }
-    a {
-      display: inline-block;
-      padding: 12px 30px;
-      border-radius: 6px;
-      text-decoration: none;
-      font-size: 18px;
-      font-weight: 600;
-      transition: all 0.3s ease;
-    }
-    .login {
-      background: #667eea;
-      color: white;
-    }
-    .login:hover {
-      background: #5568d3;
-      transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-    }
-    .signup {
-      background: #764ba2;
-      color: white;
-    }
-    .signup:hover {
-      background: #633a8a;
-      transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(118, 75, 162, 0.4);
-    }
-  </style>
+  <title>Rummy Hidden Joker</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/main.css" />
 </head>
-<body>
-  <div class="container">
-    <h1>Welcome</h1>
-    <div class="links">
-      <a href="/auth/login" class="login">Login</a>
-      <a href="/auth/signup" class="signup">Signup</a>
+<body style="background: #0c0e1a; color: #f5f5f5; min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+  <div style="text-align: center; max-width: 600px; padding: 48px 24px;">
+    <h1 style="font-size: 3.5rem; margin-bottom: 16px; font-weight: 800; color: #ffffff;">Hidden Joker Rummy</h1>
+    <p style="font-size: 1.2rem; margin-bottom: 36px; color: #c2c6dd;">Form sets and runs while discovering the secret wild card.</p>
+    <div style="display: flex; gap: 18px; justify-content: center; flex-wrap: wrap;">
+      <a href="/auth/signup" style="padding: 14px 32px; background: #2c3e5f; color: #ffffff; border: 2px solid #4a6fa5; border-radius: 8px; text-decoration: none; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.background='#3a4a6f'" onmouseout="this.style.background='#2c3e5f'">Sign Up</a>
+      <a href="/auth/login" style="padding: 14px 32px; background: #2c3e5f; color: #ffffff; border: 2px solid #4a6fa5; border-radius: 8px; text-decoration: none; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.background='#3a4a6f'" onmouseout="this.style.background='#2c3e5f'">Log In</a>
     </div>
   </div>
 </body>

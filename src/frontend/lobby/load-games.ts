@@ -36,6 +36,19 @@ export async function loadGames() {
       const isFull = playerCount >= maxPlayers;
       const isWaiting = game.state === "waiting";
       const joinable = isWaiting && !isFull;
+      const userInGame = game.user_in_game || false;
+      
+      let buttonText = 'Join Game';
+      let buttonDisabled = !joinable;
+      
+      if (userInGame) {
+        buttonText = 'Return to Game';
+        buttonDisabled = false;
+      } else if (isFull) {
+        buttonText = 'Game Full';
+      } else if (!isWaiting) {
+        buttonText = 'In Progress';
+      }
       
       gameElement.innerHTML = `
         <div class="game-info">
@@ -43,11 +56,11 @@ export async function loadGames() {
           <p>Status: ${game.state}</p>
           <p>Players: ${playerCount}/${maxPlayers}</p>
           ${isFull ? '<p class="game-full-error">Game is full</p>' : ''}
-          ${!isWaiting && !isFull ? '<p class="game-full-error">Game already started</p>' : ''}
+          ${!isWaiting && !userInGame ? '<p class="game-full-error">Game already started</p>' : ''}
           <div class="game-error" aria-live="polite"></div>
         </div>
-        <button class="join-game-btn" data-game-id="${game.id}" ${joinable ? '' : 'disabled'}>
-          ${isFull ? 'Game Full' : (isWaiting ? 'Join Game' : 'In Progress')}
+        <button class="join-game-btn" data-game-id="${game.id}" ${buttonDisabled ? 'disabled' : ''}>
+          ${buttonText}
         </button>
       `;
       
@@ -56,6 +69,12 @@ export async function loadGames() {
       
       if (joinButton) {
         joinButton.addEventListener("click", async () => {
+          // If user is already in the game, just navigate to it
+          if (userInGame) {
+            window.location.href = `/games/${game.id}`;
+            return;
+          }
+          
           // If not joinable, stay on lobby and show reason
           if (!joinable) {
             if (errorEl) {

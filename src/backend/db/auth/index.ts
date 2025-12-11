@@ -14,16 +14,21 @@ const signup = async (username: string, email: string, clearTextPassword: string
   }
 };
 
-const login = async (username: string, clearTextPassword: string) => {
+const login = async (usernameOrEmail: string, clearTextPassword: string) => {
+  const identifier = usernameOrEmail.trim();
+  console.log("Auth.login - Looking up user:", identifier);
   // Use oneOrNone so we can handle the "no rows" case without an exception
-  const secureUser = await db.oneOrNone<SecureUser>(LOGIN, [username]);
+  const secureUser = await db.oneOrNone<SecureUser>(LOGIN, [identifier]);
 
   if (!secureUser) {
     // No user found with that username
+    console.log("Auth.login - User not found:", identifier);
     throw new Error("Invalid login information");
   }
 
+  console.log("Auth.login - User found:", secureUser.username);
   const isValid = await bcrypt.compare(clearTextPassword, secureUser.password);
+  console.log("Auth.login - Password valid:", isValid);
   if (!isValid) {
     throw new Error("Invalid login information");
   }

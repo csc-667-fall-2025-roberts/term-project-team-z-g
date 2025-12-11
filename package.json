@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build:backend": "rm -rf dist && tsc && cp -R src/backend/views dist/views",
+    "build:backend": "rm -rf dist && tsc && cp -R src/backend/views dist/backend/views && cp -R src/backend/public dist/backend/public",
     "build:frontend": "esbuild src/frontend/entrypoint.ts --bundle --outfile=dist/public/js/bundle.js",
     "build": "npm run build:backend && npm run build:frontend",
-    "start": "node dist/server.js",
+    "start": "node dist/backend/server.js",
     "dev:frontend": "esbuild src/frontend/entrypoint.ts --bundle --outfile=src/backend/public/js/bundle.js --sourcemap --target=es2020 --watch",
     "dev:backend": "nodemon --exec ts-node --transpile-only src/backend/server.ts",
     "dev": "concurrently --names \"backend,frontend,live\" --prefix-colors \"green,blue,magenta\" \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:live\"",
@@ -15,7 +15,7 @@
     "migrate:create": "node-pg-migrate create -j ts --",
 
     "migrate:up": "NODE_OPTIONS='--import tsx' node-pg-migrate up",
-    "migrate:down": "NODE_OPTIONS='--import tsx'node-pg-migrate down"
+    "migrate:down": "NODE_OPTIONS='--import tsx' node-pg-migrate down"
   },
   "keywords": [],
   "author": "",

@@ -20,16 +20,15 @@ body{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica
 .compose button{padding:10px 14px;background:#2563eb;color:#fff;border-radius:8px;border:none}
 .template{display:none}
 /* Simple chat styles to match screenshot: message bubble, username link, timestamp, input */
-body {
+#chat-area {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
-  background: #fff;
-  color: #111;
+  color: #e8e9f5;
 }
 
 #chat-area {
   max-width: 640px;
-  margin: 20px auto;
-  padding: 0 16px;
+  margin: 0;
+  padding: 0;
 }
 
 #message-listing {
@@ -39,11 +38,12 @@ body {
 }
 
 .chat-message {
-  background: #f6f7f8;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
   padding: 12px 14px;
   margin-bottom: 12px;
-  box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 
 .message-header {
@@ -53,19 +53,20 @@ body {
   align-items: baseline;
 }
 
+
 .message-username {
-  color: #0b69ff;
+  color: #ffb37e;
   font-weight: 600;
   text-decoration: none;
 }
 
 .message-time {
-  color: #666;
+  color: #9ca1c7;
   font-size: 0.85rem;
 }
 
 .message-text {
-  color: #222;
+  color: #f1f1f1;
   white-space: pre-wrap;
 }
 
@@ -77,19 +78,27 @@ body {
 
 #message-submit input[type="text"] {
   flex: 1 1 auto;
-  padding: 8px 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+}
+
+#message-submit input[type="text"]::placeholder {
+  color: #9ca1c7;
 }
 
 #message-submit button {
-  padding: 6px 12px;
-  border-radius: 4px;
-  border: 1px solid #999;
-  background: #fff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #ff6b3d;
+  background: linear-gradient(135deg, #ff6b3d, #ff945f);
+  color: #fff;
   cursor: pointer;
+  box-shadow: 0 10px 25px rgba(255, 107, 61, 0.35);
 }
 
 #message-submit button:hover {
-  background: #f2f2f2;
+  background: linear-gradient(135deg, #ff825a, #ffb37e);
 }
