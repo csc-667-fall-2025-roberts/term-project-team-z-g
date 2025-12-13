@@ -35,13 +35,18 @@ export async function loadGames() {
       const maxPlayers = game.max_players || 4;
       const isFull = playerCount >= maxPlayers;
       const isWaiting = game.state === "waiting";
+      const isFinished = game.state === "finished";
+      const isInProgress = game.state === "in_progress";
       const joinable = isWaiting && !isFull;
       const userInGame = game.user_in_game || false;
-      
+
       let buttonText = 'Join Game';
       let buttonDisabled = !joinable;
-      
-      if (userInGame) {
+
+      if (isFinished) {
+        buttonText = 'View Results';
+        buttonDisabled = false;
+      } else if (userInGame) {
         buttonText = 'Return to Game';
         buttonDisabled = false;
       } else if (isFull) {
@@ -50,13 +55,23 @@ export async function loadGames() {
         buttonText = 'In Progress';
       }
       
+      let statusNote = '';
+      if (isFinished) {
+        statusNote = '<p class="game-status-note" style="color:#1e9b4c;">Complete.</p>';
+      } else if (isInProgress && isFull) {
+        statusNote = '<p class="game-status-note" style="color:#b36b00;">Full and in progress.</p>';
+      } else if (isFull) {
+        statusNote = '<p class="game-status-note game-full-error">Game is full</p>';
+      } else if (!isWaiting && !userInGame) {
+        statusNote = '<p class="game-status-note game-full-error">Game already started</p>';
+      }
+
       gameElement.innerHTML = `
         <div class="game-info">
-          <h3>Game #${game.id}</h3>
+          <h3>${game.name || 'Game #' + game.id}</h3>
           <p>Status: ${game.state}</p>
           <p>Players: ${playerCount}/${maxPlayers}</p>
-          ${isFull ? '<p class="game-full-error">Game is full</p>' : ''}
-          ${!isWaiting && !userInGame ? '<p class="game-full-error">Game already started</p>' : ''}
+          ${statusNote}
           <div class="game-error" aria-live="polite"></div>
         </div>
         <button class="join-game-btn" data-game-id="${game.id}" ${buttonDisabled ? 'disabled' : ''}>
@@ -69,6 +84,12 @@ export async function loadGames() {
       
       if (joinButton) {
         joinButton.addEventListener("click", async () => {
+          // Finished games go to results page for everyone
+          if (isFinished) {
+            window.location.href = `/games/${game.id}/results`;
+            return;
+          }
+
           // If user is already in the game, just navigate to it
           if (userInGame) {
             window.location.href = `/games/${game.id}`;

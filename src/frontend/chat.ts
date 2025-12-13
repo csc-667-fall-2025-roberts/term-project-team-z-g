@@ -17,7 +17,14 @@ const appendMessage = (payload: { username: string; created_at: string | Date; m
 
   const timeSpan = clone.querySelector(".message-time");
   const time = new Date(created_at);
-  timeSpan!.textContent = time.toLocaleTimeString();
+  timeSpan!.textContent = time.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 
   const usernameSpan = clone.querySelector(".message-username");
   usernameSpan!.textContent = username;

@@ -106,6 +106,14 @@
       .results-winner { color: #5c3ba0; font-weight: 700; font-size: 1.35rem; }
       .results-joker { background: #e0f7f1; border: 2px solid #1aa68a; border-radius: 10px; padding: 10px 14px; display: inline-block; font-weight: 600; }
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script>
+      // Fallback: if CDN fails, load from node_modules
+      if (!window.bootstrap) {
+        const script = document.createElement('script');
+        script.src = '/node_modules/bootstrap/dist/js/bootstrap.bundle.min.js';
+        document.head.appendChild(script);
+      }
+    </script>
     <script src="/js/bundle.js"></script>
       .results-list { border: 2px solid #d33; border-radius: 10px; padding: 10px 14px; background: #fff; }
       .results-list + .results-list { margin-top: 10px; }
@@ -185,7 +193,7 @@
             <span id="finished-text">Game over!</span>
             <img id="results-img" class="results-image" src="/images/IMG_1340.jpeg" alt="Game results" onerror="this.style.display='none'" />
             <div>
-              <button id="finished-back-btn" class="btn btn-outline-light btn-sm">Back to Lobby Now</button>
+              <button id="finished-back-btn" class="btn btn-outline-light btn-sm">View Results Page</button>
             </div>
           </div>
         </div>
@@ -284,6 +292,25 @@
         renderLaidSets();
         updateFinishedState();
         checkForWinner();
+        updateStartButtonState();
+      }
+
+      function updateStartButtonState() {
+        const startBtn = document.getElementById('start-game');
+        if (!startBtn) return;
+        
+        const playerCount = (gameState.players || []).length;
+        const maxPlayers = <%- game.max_players %>;
+        const isFull = playerCount === maxPlayers;
+        
+        startBtn.disabled = !isFull;
+        if (!isFull) {
+          startBtn.title = `Waiting for ${maxPlayers - playerCount} more player(s) (${playerCount}/${maxPlayers})`;
+          startBtn.textContent = `Start Game (${playerCount}/${maxPlayers})`;
+        } else {
+          startBtn.title = 'All players joined - Ready to start!';
+          startBtn.textContent = 'Start Game';
+        }
       }
 
       function checkForWinner() {
@@ -552,10 +579,20 @@
         const indicator = document.getElementById('turn-indicator');
         if (gameState.state !== 'in_progress') {
           indicator.textContent = '';
+          // When not in progress, disable all actions
+          const deckBtn = document.getElementById('draw-deck-btn');
+          const discardDrawBtn = document.getElementById('draw-discard-btn');
+          const discardBtn = document.getElementById('discard-btn');
+          const layBtn = document.getElementById('lay-down-set-btn');
+          if (deckBtn) deckBtn.style.pointerEvents = 'none';
+          if (discardDrawBtn) discardDrawBtn.style.pointerEvents = 'none';
+          if (discardBtn) discardBtn.disabled = true;
+          if (layBtn) layBtn.disabled = true;
           return;
         }
         
-        if (gameState.current_turn_player_id === currentUserId) {
+        const isMyTurn = gameState.current_turn_player_id === currentUserId;
+        if (isMyTurn) {
           indicator.textContent = "✓ It's your turn!";
           indicator.className = 'small text-success ms-3';
         } else {
@@ -564,6 +601,27 @@
           indicator.textContent = `Waiting for ${playerName}...`;
           indicator.className = 'small text-muted ms-3';
         }
+
+        // Enable/disable actions per turn rules
+        const deckBtn = document.getElementById('draw-deck-btn');
+        const discardDrawBtn = document.getElementById('draw-discard-btn');
+        const discardBtn = document.getElementById('discard-btn');
+        const layBtn = document.getElementById('lay-down-set-btn');
+        if (deckBtn) deckBtn.style.pointerEvents = isMyTurn ? 'auto' : 'none';
+        if (discardDrawBtn) discardDrawBtn.style.pointerEvents = isMyTurn ? 'auto' : 'none';
+        if (discardBtn) {
+          discardBtn.disabled = !isMyTurn;
+          // Add visual styling for disabled state
+          if (!isMyTurn) {
+            discardBtn.style.opacity = '0.5';
+            discardBtn.style.cursor = 'not-allowed';
+          } else {
+            discardBtn.style.opacity = '1';
+            discardBtn.style.cursor = 'pointer';
+          }
+        }
+        // Lay Down Set stays enabled even when not your turn
+        if (layBtn) layBtn.disabled = false;
       }
 
       async function startGame() {
@@ -769,7 +827,7 @@
       }
 
       document.getElementById('finished-back-btn')?.addEventListener('click', () => {
-        window.location.href = '/lobby';
+        window.location.href = `/games/${gameId}/results`;
       });
 
       function showResultsModal({ winnerName = 'Player', hiddenJokerRank = null, scores = [] }) {
@@ -812,9 +870,9 @@
 
         resultsModal.show();
 
-        // Auto-redirect everyone to lobby after 6s if they don't click
+        // Auto-redirect everyone to the standalone results page after 6s if they don't click
         setTimeout(() => {
-          window.location.href = '/lobby';
+          window.location.href = `/games/${gameId}/results`;
         }, 6000);
       }
 
@@ -843,7 +901,7 @@
           showResultsModal({ winnerName: winner?.username || 'Player', hiddenJokerRank, scores });
           // If no bootstrap modal (guarded above), still redirect after delay to lobby
           if (!window.bootstrap || !window.bootstrap.Modal) {
-            setTimeout(() => { window.location.href = '/lobby'; }, 6000);
+            setTimeout(() => { window.location.href = `/games/${gameId}/results`; }, 6000);
           }
         }
       }
@@ -864,6 +922,18 @@
       // Load initial state and set up polling
       loadGameState();
       setInterval(loadGameState, 2000);
+      
+      // Listen for game:winner socket event (real-time win detection)
+      if (typeof io !== 'undefined') {
+        const socket = io();
+        socket.on('game:winner', (data) => {
+          console.log('game:winner event received:', data);
+          // Reload state to get updated winner_id and state
+          loadGameState().then(() => {
+            // updateFinishedState() will be called by updateGameDisplay
+          });
+        });
+      }
       
       // Initialize button states
       updateSetButton();

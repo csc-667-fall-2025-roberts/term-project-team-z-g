@@ -40,7 +40,11 @@ router.post("/", async (req, res, next) => {
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    const game = await Games.create(session.user.id);
+    const { name, max_players } = req.body;
+    const gameName = name || "Game";
+    const maxPlayers = max_players ? Number(max_players) : 4;
+
+    const game = await Games.create(session.user.id, gameName, maxPlayers);
     // auto-join creator
     await Games.join(game.id, session.user.id);
     const io = req.app.get("io");
@@ -71,6 +75,14 @@ router.get("/:id", async (req, res, next) => {
 
     const session: any = (req as any).session;
     let gameFullError = false;
+
+    // If the game is already finished, send users straight to the results page
+    if (game.state === "finished") {
+      if (req.accepts(["html", "json"]) && req.accepts("html")) {
+        return res.redirect(`/games/${gameId}/results`);
+      }
+      return res.json({ state: game.state, redirect: `/games/${gameId}/results` });
+    }
     
     // Auto-join the current user if not already in the game and game is not full
     if (session?.user) {
@@ -213,6 +225,13 @@ router.post("/:id/start", async (req, res, next) => {
        ORDER BY joined_at`,
       [gameId]
     );
+
+    // Check that player count matches max_players
+    if (players.length !== existingGame.max_players) {
+      return res.status(400).json({ 
+        error: `Game requires ${existingGame.max_players} players to start. Currently ${players.length}/${existingGame.max_players}.` 
+      });
+    }
 
     // Ensure the creator/current user is part of the game
     const playerIds = players.map((p: any) => p.player_id);
@@ -411,7 +430,7 @@ router.post("/:id/lay-set", async (req, res, next) => {
     if (Number(handSize.count) === 0) {
       await GameLogic.declareWinner(gameId, session.user.id);
       if (io) {
-        io.emit("game:won", { gameId, winnerId: session.user.id });
+        io.to(`game:${gameId}`).emit("game:winner", { gameId, winnerId: session.user.id });
       }
       return res.json({ success: true, won: true });
     }
@@ -480,6 +499,8 @@ router.post("/:id/restart", async (req, res, next) => {
     const io = req.app.get("io");
     if (io) {
       io.to(`game:${gameId}`).emit("game:restart", { gameId });
+      // Force all connected clients in this game to logout
+      io.to(`game:${gameId}`).emit("game:force-logout", { gameId });
     }
 
     res.json({ success: true });
@@ -522,6 +543,46 @@ router.post("/:id/arrange-hand", async (req, res, next) => {
   }
 });
 
+// GET /games/:id/results – show a standalone results page
+router.get("/:id/results", async (req, res, next) => {
+  const gameId = Number(req.params.id);
+  if (Number.isNaN(gameId)) {
+    return next(createHttpError(400, "Invalid game id"));
+  }
+
+  try {
+    const game = await Games.get(gameId);
+    if (!game) {
+      return next(createHttpError(404, "Game not found"));
+    }
+
+    const session: any = (req as any).session;
+    const gameState = await GameLogic.getGameState(gameId);
+
+    // If the game isn't finished, send folks back to the live table
+    if (gameState?.state !== "finished") {
+      return res.redirect(`/games/${gameId}`);
+    }
+
+    const players = Array.isArray(gameState?.players) ? gameState.players : [];
+    const winnerId = gameState?.winner_id ?? null;
+    const winner = winnerId ? players.find((p: any) => p.player_id === winnerId) : null;
+    const scores = players
+      .map((p: any) => ({ name: p.username, points: Number(p.card_count) || 0 }))
+      .sort((a: any, b: any) => a.points - b.points);
+
+    return res.render("games/results", {
+      game,
+      winner,
+      scores,
+      hiddenJokerRank: gameState?.hidden_joker_rank || null,
+      currentUser: session?.user || null,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /games/:id/state – get game state
 router.get("/:id/state", async (req, res, next) => {
   const gameId = Number(req.params.id);
@@ -537,16 +598,19 @@ router.get("/:id/state", async (req, res, next) => {
 
     const session: any = (req as any).session;
     const gameState = await GameLogic.getGameState(gameId);
+    console.log('State endpoint - userId:', session?.user?.id, 'gameId:', gameId);
     const playerHand = session?.user ? await GameLogic.getPlayerHand(gameId, session.user.id) : [];
+    console.log('playerHand from GameLogic:', playerHand, 'length:', playerHand?.length);
     const myLaidCards = session?.user ? await db.manyOrNone(
       `SELECT id, suit, rank FROM game_cards 
        WHERE game_id = $1 AND player_id = $2 AND location = 'laid' 
        ORDER BY position`,
       [gameId, session.user.id]
     ) : [];
+    console.log('myLaidCards:', myLaidCards, 'length:', myLaidCards?.length);
 
-    console.log('getGameState result:', gameState);
-    console.log('playerHand result:', playerHand);
+    console.log('getGameState result:', JSON.stringify(gameState, null, 2));
+    console.log('playerHand result (before clean):', JSON.stringify(playerHand, null, 2));
 
     // Clean the gameState to ensure it's JSON serializable
     const cleanState = {
@@ -555,6 +619,7 @@ router.get("/:id/state", async (req, res, next) => {
       state: gameState?.state,
       current_turn_player_id: gameState?.current_turn_player_id,
       hidden_joker_rank: gameState?.hidden_joker_rank,
+      winner_id: gameState?.winner_id,
       turn_number: gameState?.turn_number || 0,
       players: gameState?.players || [],
       discard_pile: gameState?.discard_pile || [],
