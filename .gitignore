@@ -1,5 +1,20 @@
+# Node / build
 node_modules/
 dist/
 logs/
-.env
 src/backend/public/js/
+
+# Environment variables
+.env
+
+# macOS junk files
+.DS_Store
+**/.DS_Store
+
+# Editor / OS junk
+.vscode/
+Thumbs.db
+
+# Maps / caches
+*.map
+.cache/
