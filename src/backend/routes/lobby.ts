@@ -25,7 +25,7 @@ router.get("/", requireAuth, async (req, res, next) => {
     const session: any = (req as any).session;
     
     // Check if the current user is in any active games
-    let activeGame = null;
+    let activeGame: { id: number; name: string; state: string; player_count: number; max_players: number } | null = null;
     if (session?.user) {
       activeGame = await db.oneOrNone<{
         id: number;

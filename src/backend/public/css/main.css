@@ -429,7 +429,7 @@ body.lobby-page .navbar {
 
 @media (min-width: 1024px) {
   .lobby-wrapper {
-    grid-template-columns: 1.2fr 1.5fr;
+    grid-template-columns: 1fr 350px;
     max-width: 1400px;
   }
 }
@@ -439,6 +439,13 @@ body.lobby-page .navbar {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+/* Right column (Chat) - fixed width and scrollable */
+aside {
+  height: fit-content;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
 }
 
 /* Create Game Panel */
@@ -499,6 +506,8 @@ body.lobby-page .navbar {
   border-radius: 0.95rem;
   padding: 1.5rem;
   flex: 1;
+  max-height: calc(100vh - 280px);
+  overflow-y: auto;
 }
 
 /* Chat Panel */

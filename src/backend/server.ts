@@ -12,17 +12,28 @@ import logger from "./lib/logger";
 
 configDotenv();
 
-// Set up livereload in development (optional)
 const isDevelopment = process.env.NODE_ENV !== "production";
+
+// Set up livereload in development (optional)
+// Temporarily disabled due to port conflicts
+/*
 if (isDevelopment) {
   try {
     const livereload = require("livereload");
     const liveReloadServer = livereload.createServer({ exts: ["ejs", "css", "js"] });
     liveReloadServer.watch([path.join(__dirname, "views"), path.join(__dirname, "public")]);
+    liveReloadServer.server.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        logger.warn('Livereload port in use, skipping livereload');
+      } else {
+        logger.error('Livereload error:', err);
+      }
+    });
   } catch (_err) {
     logger.warn("livereload not installed; skipping live reload");
   }
 }
+*/
 
 const app = express();
 const httpServer = createServer(app);
@@ -72,6 +83,40 @@ app.use("/", routes.root);
 app.use("/auth", routes.auth);
 app.use("/lobby", requireUser, routes.lobby);
 app.use("/chat", requireUser, routes.chat);
+// Allow force-restart to bypass requireUser
+app.post("/games/:id/restart", async (req, res, next) => {
+  const force = req.query.force === "1" || req.query.force === "true";
+  if (force) {
+    const gameId = Number(req.params.id);
+    if (Number.isNaN(gameId)) {
+      return res.status(400).json({ error: "Invalid game id" });
+    }
+    try {
+      const { GameLogic } = await import("./services/game-logic");
+      const db = (await import("./db/connection")).default;
+      const players = await db.manyOrNone<{ user_id: number }>(
+        `SELECT user_id FROM game_players WHERE game_id = $1 ORDER BY hand_order`,
+        [gameId]
+      );
+      if (!players.length) {
+        return res.status(400).json({ error: "No players in this game" });
+      }
+      console.log("[force-restart] Restarting game", gameId);
+      await GameLogic.initializeGame(gameId, players.map(p => p.user_id));
+      const io = req.app.get("io");
+      if (io) {
+        io.to(`game:${gameId}`).emit("game:restart", { gameId, force: true });
+        io.to(`game:${gameId}`).emit("game:state-refresh", { gameId });
+      }
+      return res.json({ success: true, message: "Game restarted" });
+    } catch (err) {
+      console.error("[force-restart] Error:", err);
+      return next(err);
+    }
+  }
+  next();
+});
+
 app.use("/games", requireUser, routes.games);
 app.use("/users", requireUser, routes.users);
 

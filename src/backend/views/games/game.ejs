@@ -138,7 +138,24 @@
           <div class="card-body d-flex justify-content-between align-items-center">
             <div>
               <h1 class="h5 mb-1"><%= game.name %></h1>
-              <div class="small text-muted">Game ID: <%= game.id %> · State: <span id="game-state"><%= game.state %></span></div>
+              <div class="small text-muted">
+                Game ID: <%= game.id %> · State: <span id="game-state"><%= game.state %></span>
+                <% 
+                  // Find current player's joker_revealed status
+                  const currentUserId = ((typeof session !== 'undefined') && session.user) ? session.user.id : null;
+                  const currentPlayer = gameState?.players?.find(p => p.player_id === currentUserId);
+                  const canSeeJoker = currentPlayer?.joker_revealed;
+                  const headerJoker = (game && game.hidden_joker_rank) || (gameState && gameState.hidden_joker_rank);
+                  
+                  if (headerJoker && canSeeJoker) { 
+                %>
+                  · Joker: <strong class="text-warning"><%= headerJoker %></strong>
+                <% } else if (game.state === 'waiting') { %>
+                  · Joker: <span class="text-muted">(set when game starts)</span>
+                <% } else if (game.state === 'in_progress') { %>
+                  · Joker: <span class="text-muted" id="joker-hidden">❓ (lay pure sequence to reveal)</span>
+                <% } %>
+              </div>
             </div>
             <div class="d-flex gap-2">
               <% if (game.state === 'waiting') { %>
@@ -170,10 +187,10 @@
         </div>
 
         <div class="player-hand">
-          <h5>Your Hand</h5>
+          <h5 class="text-dark">Your Hand</h5>
           <div id="player-hand" class="d-flex flex-wrap"></div>
           <div class="mt-3">
-            <button id="lay-down-set-btn" class="btn btn-success me-2">Lay Down Set</button>
+            <button id="lay-down-set-btn" class="btn btn-success me-2">Lay Down Sequence</button>
             <button id="discard-btn" class="btn btn-primary" disabled>Discard Selected Card</button>
             <span class="small text-muted ms-3" id="turn-indicator"></span>
           </div>
@@ -183,7 +200,13 @@
         <div class="card mt-3">
           <div class="card-body">
             <h5 class="h6 mb-2">Your Laid Sets</h5>
-            <div id="laid-sets" class="d-flex flex-wrap gap-2"></div>
+            <div id="laid-sets" class="d-flex flex-wrap gap-2 mb-3"></div>
+            <div class="d-flex align-items-center gap-2">
+              <label for="meld-select" class="small text-muted">Select a set:</label>
+              <select id="meld-select" class="form-select form-select-sm" style="max-width: 220px;"></select>
+              <button id="add-to-meld-btn" class="btn btn-outline-success btn-sm" disabled>Add selected card to set</button>
+              <span id="add-to-meld-msg" class="small ms-2"></span>
+            </div>
           </div>
         </div>
 
@@ -230,6 +253,44 @@
       let playerCards = [];
       let cardOrder = []; // Track custom card order by card ID
       let resultsModal = null;
+      let dragPayload = null; // Tracks cross-area drag info
+      function updateAddToMeldButton() {
+        const addBtn = document.getElementById('add-to-meld-btn');
+        const select = document.getElementById('meld-select');
+        if (!addBtn || !select || !gameState) return;
+        const me = gameState.players?.find(p => p.player_id === currentUserId);
+        const melds = Array.isArray(me?.melds) ? me.melds : (me?.melds ? JSON.parse(me.melds) : []);
+        const hasMelds = Array.isArray(melds) && melds.length > 0;
+        const hasCard = selectedCardId !== null;
+        addBtn.disabled = !(hasMelds && hasCard);
+      }
+
+      async function moveCardBetweenGroups(params) {
+        try {
+          const res = await fetch(`/games/${gameId}/move-card-between-groups`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            showMeldMessage(data.error || 'Move failed', 'error');
+            return;
+          }
+          await loadGameState();
+          // Show special message if meld was dissolved
+          if (data.message) {
+            showMeldMessage(data.message, 'success');
+          } else {
+            showMeldMessage('Card moved', 'success');
+          }
+        } catch (err) {
+          console.error('moveCardBetweenGroups error', err);
+          showMeldMessage('Error: ' + err.message, 'error');
+        } finally {
+          dragPayload = null;
+        }
+      }
 
       async function loadGameState() {
         try {
@@ -293,6 +354,7 @@
         updateFinishedState();
         checkForWinner();
         updateStartButtonState();
+        updateAddToMeldButton();
       }
 
       function updateStartButtonState() {
@@ -337,14 +399,36 @@
         const melds = Array.isArray(me?.melds) ? me.melds : (me?.melds ? JSON.parse(me.melds) : []);
         const laidMap = new Map((window.lastStateAllCards || []).map(c => [c.id, c]));
 
+        // Populate select options
+        const select = document.getElementById('meld-select');
+        if (select) {
+          select.innerHTML = '';
+          melds.forEach((m, idx) => {
+            const opt = document.createElement('option');
+            opt.value = String(idx);
+            opt.textContent = `Set ${idx + 1} (${m.length} cards)`;
+            select.appendChild(opt);
+          });
+          // Ensure button state is updated
+          updateAddToMeldButton();
+        }
+
         for (const meld of melds) {
           const group = document.createElement('div');
           group.className = 'd-flex align-items-center gap-1 p-2 border rounded bg-white';
+          group.dataset.meldIndex = String(container.children.length);
+          group.addEventListener('dragover', handleHandDragOver);
+          group.addEventListener('drop', handleMeldDrop);
           for (const cardId of meld) {
             const c = laidMap.get(cardId);
             if (!c) continue;
             const div = document.createElement('div');
             div.className = `playing-card ${getSuitColor(c.suit)}`;
+            div.draggable = true;
+            div.dataset.cardId = String(c.id);
+            div.dataset.meldIndex = String(container.children.length);
+            div.addEventListener('dragstart', handleMeldCardDragStart);
+            div.addEventListener('dragend', handleMeldCardDragEnd);
             div.innerHTML = `<div class="card-rank">${c.rank}</div><div class="card-suit">${getSuitSymbol(c.suit)}</div>`;
             group.appendChild(div);
           }
@@ -372,7 +456,7 @@
           const userLabel = isCurrentUser ? ' (You)' : '';
           
           div.innerHTML = `
-            <div class="fw-bold">${player.username}${userLabel}</div>
+            <div class="fw-bold text-dark">${player.username}${userLabel}</div>
             <div class="small text-muted">${player.card_count || 0} cards</div>
           `;
           container.appendChild(div);
@@ -384,6 +468,13 @@
       function renderPlayerHand() {
         const container = document.getElementById('player-hand');
         container.innerHTML = '';
+
+        // Allow dropping cards dragged from laid sets back into hand
+        if (!container.dataset.dropInit) {
+          container.addEventListener('dragover', handleHandDragOver);
+          container.addEventListener('drop', handleHandDrop);
+          container.dataset.dropInit = '1';
+        }
         
         if (!playerCards || playerCards.length === 0) {
           container.innerHTML = '<div class="text-muted">No cards yet</div>';
@@ -392,6 +483,10 @@
         
         playerCards.forEach((card, index) => {
           const cardDiv = createCardElement(card, index);
+          // Re-apply selected class if this card was previously selected
+          if (selectedCardsForSet.includes(card.id)) {
+            cardDiv.classList.add('selected');
+          }
           container.appendChild(cardDiv);
         });
       }
@@ -440,6 +535,7 @@
 
       function handleDragStart(e) {
         draggedCard = this;
+        dragPayload = { source: 'hand', cardId: Number(this.dataset.cardId || 0) };
         this.style.opacity = '0.5';
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/html', this.innerHTML);
@@ -459,6 +555,11 @@
         }
         if (e.preventDefault) {
           e.preventDefault();
+        }
+
+        // If dragging from a meld, let the hand container handle it
+        if (dragPayload && dragPayload.source === 'meld') {
+          return false;
         }
 
         if (draggedCard && draggedCard !== this) {
@@ -501,6 +602,51 @@
       function handleDragEnd(e) {
         this.style.opacity = '1';
         draggedCard = null;
+        dragPayload = null;
+      }
+
+      function handleHandDragOver(e) {
+        if (e.preventDefault) e.preventDefault();
+      }
+
+      function handleHandDrop(e) {
+        if (e.preventDefault) e.preventDefault();
+        if (dragPayload && dragPayload.source === 'meld') {
+          moveCardBetweenGroups({
+            cardId: dragPayload.cardId,
+            from: 'meld',
+            to: 'hand',
+            fromMeldIndex: dragPayload.meldIndex
+          });
+        }
+      }
+
+      function handleMeldCardDragStart(e) {
+        dragPayload = {
+          source: 'meld',
+          cardId: Number(this.dataset.cardId || 0),
+          meldIndex: Number(this.dataset.meldIndex || -1)
+        };
+        this.style.opacity = '0.5';
+        e.dataTransfer.effectAllowed = 'move';
+      }
+
+      function handleMeldCardDragEnd() {
+        this.style.opacity = '1';
+        dragPayload = null;
+      }
+
+      function handleMeldDrop(e) {
+        if (e.preventDefault) e.preventDefault();
+        const idx = Number(this.dataset.meldIndex || -1);
+        if (dragPayload && dragPayload.source === 'hand') {
+          moveCardBetweenGroups({
+            cardId: dragPayload.cardId,
+            from: 'hand',
+            to: 'meld',
+            toMeldIndex: idx
+          });
+        }
       }
 
       function getSuitColor(suit) {
@@ -543,6 +689,8 @@
             element.classList.add('selected');
           }
           document.getElementById('discard-btn').disabled = selectedCardId === null;
+          // Toggle add-to-meld button availability
+          updateAddToMeldButton();
         }
       }
 
@@ -550,10 +698,10 @@
         const btn = document.getElementById('lay-down-set-btn');
         if (selectedCardsForSet.length >= 3) {
           btn.disabled = false;
-          btn.textContent = `Lay Down Set (${selectedCardsForSet.length} cards)`;
+          btn.textContent = `Lay Down Sequence (${selectedCardsForSet.length} cards)`;
         } else {
           btn.disabled = true;
-          btn.textContent = 'Lay Down Set';
+          btn.textContent = 'Lay Down Sequence';
         }
       }
 
@@ -755,9 +903,9 @@
         // Get the selected cards
         const setCards = playerCards.filter(card => selectedCardsForSet.includes(card.id));
         
-        // Validate it's a valid set (same rank, different suits)
+        // Validate it's a valid sequence (consecutive ranks, same suit) OR set (same rank, distinct suits)
         if (!validateSet(setCards)) {
-          showMeldMessage('Invalid set! Cards must be the same rank with different suits', 'error');
+          showMeldMessage('Invalid meld. Must be either a sequence (3+ consecutive same suit) or a set (3-4 same rank, distinct suits).', 'error');
           return;
         }
 
@@ -778,29 +926,151 @@
               showFinishedBanner('You won! Game over.');
               disableAllActions();
             } else {
-              showMeldMessage('Set laid down successfully!', 'success');
+              showMeldMessage('Sequence laid down successfully!', 'success');
               selectedCardsForSet = [];
               updateSetButton();
               await loadGameState();
             }
           } else {
-            showMeldMessage(data.error || 'Failed to lay down set', 'error');
+            showMeldMessage(data.error || 'Failed to lay down sequence', 'error');
           }
         } catch (err) {
           showMeldMessage('Error: ' + err.message, 'error');
         }
       }
 
+      async function addCardToMeld() {
+        const select = document.getElementById('meld-select');
+        const msgEl = document.getElementById('add-to-meld-msg');
+        if (!select) return;
+        const meldIndex = parseInt(select.value);
+        if (Number.isNaN(meldIndex)) {
+          msgEl.textContent = 'Please select a set to add to';
+          msgEl.className = 'small text-danger ms-2';
+          return;
+        }
+        if (selectedCardId === null) {
+          msgEl.textContent = 'Select a card in your hand first';
+          msgEl.className = 'small text-danger ms-2';
+          return;
+        }
+
+        try {
+          const res = await fetch(`/games/${gameId}/add-to-meld`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ meldIndex, cardId: selectedCardId })
+          });
+          
+          // Check if response is JSON
+          const contentType = res.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            const text = await res.text();
+            console.error('Non-JSON response:', text.substring(0, 500));
+            msgEl.textContent = 'Server error - check console';
+            msgEl.className = 'small text-danger ms-2';
+            return;
+          }
+          
+          const data = await res.json();
+          if (res.ok) {
+            msgEl.textContent = 'Card added to set!';
+            msgEl.className = 'small text-success ms-2';
+            // Clear selection and refresh state
+            selectedCardId = null;
+            document.querySelectorAll('.playing-card.selected').forEach(el => el.classList.remove('selected'));
+            await loadGameState();
+          } else {
+            msgEl.textContent = data.error || 'Could not add card to set';
+            msgEl.className = 'small text-danger ms-2';
+          }
+        } catch (err) {
+          msgEl.textContent = 'Error: ' + err.message;
+          msgEl.className = 'small text-danger ms-2';
+        }
+        setTimeout(() => { if (msgEl) msgEl.textContent = ''; }, 4000);
+      }
+
       function validateSet(cards) {
         if (cards.length < 3) return false;
+
+        const hiddenJoker = gameState?.hidden_joker_rank || null;
+        const rankOrder = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+        console.log('validateSet: hiddenJoker rank:', hiddenJoker);
+        console.log('validateSet: total cards', cards.length);
+        console.log('validateSet: cards', cards.map(c => `${c.rank}${c.suit}`));
+
+        // Separate wildcards (hidden joker rank acts as wildcard regardless of suit)
+        const isWild = (card) => hiddenJoker && card.rank === hiddenJoker;
+        const nonWild = cards.filter(c => !isWild(c));
+        const wildCount = cards.length - nonWild.length;
+
+        console.log('validateSet: wildcards', wildCount, 'non-wild', nonWild.length);
+        console.log('validateSet: non-wild cards', nonWild.map(c => `${c.rank}${c.suit}`));
+
+        // Try validating as a SET first (3-4 same rank, distinct suits)
+        // Can be: 3-4 cards total, with all non-wild cards having same rank and distinct suits
+        if (cards.length >= 3 && cards.length <= 4) {
+          const ranks = new Set(nonWild.map(c => c.rank));
+          const suits = new Set(nonWild.map(c => c.suit));
+          
+          console.log('validateSet: SET check - ranks.size:', ranks.size, 'suits.size:', suits.size, 'nonWild.length:', nonWild.length);
+          
+          // If all non-wild cards have the same rank and distinct suits, it's a valid set
+          // Wildcards can fill in missing suits
+          if (ranks.size === 1 && suits.size === nonWild.length) {
+            console.log('validateSet: Valid SET (same rank, distinct suits with wildcards)');
+            return true;
+          }
+        }
+
+        // Try validating as a SEQUENCE (consecutive ranks, same suit)
+        // All non-wild cards must share suit (wildcards are suit-agnostic)
+        const suits = new Set(nonWild.map(c => c.suit));
+        if (suits.size > 1) {
+          console.log('validateSet failed: multiple suits in non-wildcards (not a sequence or set)', Array.from(suits));
+          return false;
+        }
         
-        // Check all cards have the same rank
-        const ranks = new Set(cards.map(c => c.rank));
-        if (ranks.size !== 1) return false;
-        
-        // Check all cards have different suits
-        const suits = new Set(cards.map(c => c.suit));
-        return suits.size === cards.length;
+        // If we have non-wild cards, get their suit
+        const suit = suits.size > 0 ? Array.from(suits)[0] : null;
+
+        // Require at least one non-wild card
+        if (nonWild.length === 0) {
+          console.log('validateSet failed: all wildcards');
+          return false;
+        }
+
+        // Convert ranks to indices and ensure no duplicate ranks among non-wilds
+        const indices = nonWild.map(c => rankOrder.indexOf(c.rank)).filter(i => i >= 0).sort((a, b) => a - b);
+        for (let i = 1; i < indices.length; i++) {
+          if (indices[i] === indices[i - 1]) {
+            console.log('validateSet failed: duplicate rank', rankOrder[indices[i]]);
+            return false; // duplicate rank breaks a run
+          }
+        }
+
+        // Count gaps between non-wild ranks
+        let gaps = 0;
+        for (let i = 1; i < indices.length; i++) {
+          const diff = indices[i] - indices[i - 1];
+          if (diff < 1) {
+            console.log('validateSet failed: negative diff');
+            return false;
+          }
+          if (diff > 1) gaps += (diff - 1);
+        }
+
+        // Wildcards can fill gaps
+        if (gaps > wildCount) {
+          console.log('validateSet failed: too many gaps', gaps, 'wildcards', wildCount);
+          return false;
+        }
+
+        // After filling gaps, remaining wilds can extend ends, so this is valid
+        console.log('validateSet passed: valid sequence');
+        return true;
       }
 
       function showMeldMessage(msg, type) {
@@ -918,6 +1188,8 @@
       document.getElementById('discard-btn').addEventListener('click', discardCard);
       document.getElementById('lay-down-set-btn').addEventListener('click', layDownSet);
       document.getElementById('declare-btn')?.addEventListener('click', confirmEndGame);
+      document.getElementById('add-to-meld-btn')?.addEventListener('click', addCardToMeld);
+      document.getElementById('meld-select')?.addEventListener('change', updateAddToMeldButton);
 
       // Load initial state and set up polling
       loadGameState();
@@ -932,6 +1204,39 @@
           loadGameState().then(() => {
             // updateFinishedState() will be called by updateGameDisplay
           });
+        });
+
+        // Reveal hidden joker rank in header when pure sequence laid
+        socket.on('game:joker-revealed', (data) => {
+          console.log('game:joker-revealed:', data);
+          // Only update if this event is for the current user
+          if (data.userId && data.userId !== currentUserId) {
+            console.log('Joker revealed for different user, ignoring');
+            return;
+          }
+          const rank = data?.hiddenJokerRank;
+          if (rank) {
+            console.log('Revealing joker rank:', rank);
+            // Update the header to show the joker rank
+            const jokerHidden = document.getElementById('joker-hidden');
+            if (jokerHidden) {
+              jokerHidden.innerHTML = '<strong class="text-warning">' + rank + '</strong>';
+            }
+            // Also update gameState for validation
+            if (gameState) {
+              gameState.hidden_joker_rank = rank;
+              const currentPlayer = gameState.players?.find(p => p.player_id === currentUserId);
+              if (currentPlayer) {
+                currentPlayer.joker_revealed = true;
+              }
+            }
+          }
+        });
+
+        socket.on('game:card-added-to-meld', (data) => {
+          console.log('game:card-added-to-meld:', data);
+          // Light refresh to reflect updated melds
+          loadGameState();
         });
       }
       

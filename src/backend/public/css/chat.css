@@ -34,7 +34,10 @@ body{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica
 #message-listing {
   margin: 16px 0 12px;
   min-height: 200px;
+  max-height: 300px;
   padding: 12px 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .chat-message {

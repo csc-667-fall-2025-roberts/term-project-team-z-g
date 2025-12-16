@@ -143,6 +143,7 @@ router.get("/:id", async (req, res, next) => {
       gameState,
       playerHand,
       currentUser: session?.user,
+      session,
       gameFullError
     });
   } catch (err) {
@@ -389,24 +390,47 @@ router.post("/:id/lay-set", async (req, res, next) => {
       return res.status(400).json({ error: "Invalid cards selected" });
     }
 
-    // Validate the set (sets only: same rank, all distinct suits)
-    if (!GameLogic.validateMeld(cards as any)) {
-      return res.status(400).json({ error: "Invalid set. Cards must be 3 or 4 of the same rank with all distinct suits." });
+    // Get hidden joker rank from game
+    const game = await db.one(
+      `SELECT hidden_joker_rank FROM games WHERE id = $1`,
+      [gameId]
+    );
+
+    // Validate as a sequence first (with wildcard support), then as a set
+    const sequenceValidation = GameLogic.validateSequence(cards as any, game.hidden_joker_rank);
+    const setValidation = GameLogic.validateMeld(cards as any, game.hidden_joker_rank);
+
+    if (!sequenceValidation.valid && !setValidation) {
+      return res.status(400).json({ error: "Invalid meld. Must be either a sequence (3+ consecutive same suit) or a set (3-4 same rank, distinct suits)." });
     }
 
     // Store the meld in player_hands melds column
     const playerHand = await db.one(
-      `SELECT melds FROM player_hands WHERE game_id = $1 AND player_id = $2`,
+      `SELECT melds, joker_revealed FROM player_hands WHERE game_id = $1 AND player_id = $2`,
       [gameId, session.user.id]
     );
 
     const currentMelds = playerHand.melds || [];
     currentMelds.push(cardIds);
 
-    await db.none(
-      `UPDATE player_hands SET melds = $1 WHERE game_id = $2 AND player_id = $3`,
-      [JSON.stringify(currentMelds), gameId, session.user.id]
-    );
+    // If this is a pure sequence, reveal the joker to this player
+    const shouldRevealJoker = sequenceValidation.valid && sequenceValidation.isPure && !playerHand.joker_revealed;
+    
+    console.log('[lay-set] Sequence validation:', sequenceValidation);
+    console.log('[lay-set] Set validation:', setValidation);
+    console.log('[lay-set] Should reveal joker:', shouldRevealJoker);
+    
+    if (shouldRevealJoker) {
+      await db.none(
+        `UPDATE player_hands SET melds = $1, joker_revealed = true WHERE game_id = $2 AND player_id = $3`,
+        [JSON.stringify(currentMelds), gameId, session.user.id]
+      );
+    } else {
+      await db.none(
+        `UPDATE player_hands SET melds = $1 WHERE game_id = $2 AND player_id = $3`,
+        [JSON.stringify(currentMelds), gameId, session.user.id]
+      );
+    }
 
     // Mark cards as laid down (move to a "laid" location)
     await db.none(
@@ -418,6 +442,17 @@ router.post("/:id/lay-set", async (req, res, next) => {
     const io = req.app.get("io");
     if (io) {
       io.emit("game:set-laid", { gameId, userId: session.user.id, cardIds });
+      
+      // If pure sequence was laid, notify the player that joker is revealed
+      if (shouldRevealJoker) {
+        console.log('[lay-set] Emitting joker-revealed to game:', gameId, 'for user:', session.user.id);
+        // Emit to all in game room - client will filter by userId
+        io.to(`game:${gameId}`).emit("game:joker-revealed", { 
+          gameId, 
+          userId: session.user.id,
+          hiddenJokerRank: game.hidden_joker_rank 
+        });
+      }
     }
 
     // Check win condition: if player has no cards left in hand, declare winner
@@ -441,6 +476,331 @@ router.post("/:id/lay-set", async (req, res, next) => {
   }
 });
 
+// POST /games/:id/add-to-meld – add a card to an existing laid sequence
+router.post("/:id/add-to-meld", async (req, res, next) => {
+  const gameId = Number(req.params.id);
+  if (Number.isNaN(gameId)) {
+    return next(createHttpError(400, "Invalid game id"));
+  }
+
+  try {
+    const session: any = (req as any).session;
+    if (!session || !session.user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const { meldIndex, cardId } = req.body;
+    if (!Number.isInteger(meldIndex) || !Number.isInteger(cardId)) {
+      return res.status(400).json({ error: "Invalid meldIndex or cardId" });
+    }
+
+    const state = await GameLogic.getGameState(gameId);
+    if (!state) return res.status(404).json({ error: "Game not found" });
+    if (state.state !== "in_progress") {
+      return res.status(400).json({ error: "Game is not in progress" });
+    }
+    if (state.current_turn_player_id !== session.user.id) {
+      return res.status(403).json({ error: "Not your turn" });
+    }
+
+    // Load melds for this player
+    const handRow = await db.oneOrNone(
+      `SELECT melds FROM player_hands WHERE game_id = $1 AND player_id = $2`,
+      [gameId, session.user.id]
+    );
+    if (!handRow) return res.status(404).json({ error: "Player hand not found" });
+
+    const melds = Array.isArray(handRow.melds) ? handRow.melds : [];
+    if (!Array.isArray(melds[meldIndex])) {
+      return res.status(400).json({ error: "Invalid meld index" });
+    }
+
+    // Validate card exists in player's hand
+    const cardInHand = await db.oneOrNone(
+      `SELECT id, suit, rank, location, position FROM game_cards
+       WHERE id = $1 AND game_id = $2 AND player_id = $3 AND location = 'player_hand'`,
+      [cardId, gameId, session.user.id]
+    );
+    if (!cardInHand) {
+      return res.status(400).json({ error: "Card not in player's hand" });
+    }
+
+    // Fetch sequence cards for validation
+    const sequenceCardIds: number[] = melds[meldIndex];
+    const sequenceCards = await db.manyOrNone(
+      `SELECT id, suit, rank, location, position FROM game_cards
+       WHERE game_id = $1 AND id = ANY($2)`,
+      [gameId, sequenceCardIds]
+    );
+    if (!sequenceCards || sequenceCards.length !== sequenceCardIds.length) {
+      return res.status(400).json({ error: "One or more cards in the meld are missing" });
+    }
+
+    // Validate existing meld is actually valid before attempting to extend
+    const existingValidation = GameLogic.validateSequence(sequenceCards as any, state.hidden_joker_rank);
+    if (!existingValidation.valid) {
+      return res.status(400).json({ error: "Existing meld is invalid - cannot add cards to it" });
+    }
+
+    const extension = GameLogic.canExtendSequence(
+      sequenceCards as any,
+      cardInHand as any,
+      state.hidden_joker_rank
+    );
+
+    if (!extension.canExtend) {
+      return res.status(400).json({ error: "Card cannot be added to this sequence" });
+    }
+
+    // Update meld ordering
+    const updatedMeld = [...sequenceCardIds];
+    if (extension.position === "start") {
+      updatedMeld.unshift(cardId);
+    } else if (extension.position === "end") {
+      updatedMeld.push(cardId);
+    } else if (extension.position === "middle") {
+      // Insert in sorted order by rank
+      const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+      const newRankIdx = RANKS.indexOf(cardInHand.rank);
+      let inserted = false;
+      for (let i = 0; i < sequenceCards.length; i++) {
+        const currRankIdx = RANKS.indexOf(sequenceCards[i].rank);
+        if (newRankIdx < currRankIdx) {
+          updatedMeld.splice(i, 0, cardId);
+          inserted = true;
+          break;
+        }
+      }
+      if (!inserted) updatedMeld.push(cardId);
+    }
+
+    const updatedMelds = [...melds];
+    updatedMelds[meldIndex] = updatedMeld;
+
+    // Move the card to laid
+    await db.none(
+      `UPDATE game_cards
+       SET location = 'laid', player_id = $1
+       WHERE id = $2 AND game_id = $3`,
+      [session.user.id, cardId, gameId]
+    );
+
+    // Persist melds
+    await db.none(
+      `UPDATE player_hands SET melds = $1 WHERE game_id = $2 AND player_id = $3`,
+      [JSON.stringify(updatedMelds), gameId, session.user.id]
+    );
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`game:${gameId}`).emit("game:card-added-to-meld", {
+        gameId,
+        userId: session.user.id,
+        meldIndex,
+        cardId,
+        position: extension.position
+      });
+    }
+
+    const gameState = await GameLogic.getGameState(gameId);
+    return res.json({
+      success: true,
+      meldIndex,
+      cardId,
+      position: extension.position,
+      gameState
+    });
+  } catch (err) {
+    console.error("/games/:id/add-to-meld error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /games/:id/move-card-between-groups – move a card between hand and laid melds
+router.post("/:id/move-card-between-groups", async (req, res, next) => {
+  const gameId = Number(req.params.id);
+  if (Number.isNaN(gameId)) {
+    return next(createHttpError(400, "Invalid game id"));
+  }
+
+  try {
+    const session: any = (req as any).session;
+    if (!session || !session.user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const { cardId, from, to, fromMeldIndex, toMeldIndex } = req.body;
+    if (!Number.isInteger(cardId) || (from !== "hand" && from !== "meld") || (to !== "hand" && to !== "meld") || from === to) {
+      return res.status(400).json({ error: "Invalid move payload" });
+    }
+
+    const state = await GameLogic.getGameState(gameId);
+    if (!state) return res.status(404).json({ error: "Game not found" });
+    if (state.state !== "in_progress") {
+      return res.status(400).json({ error: "Game is not in progress" });
+    }
+    if (state.current_turn_player_id !== session.user.id) {
+      return res.status(403).json({ error: "Not your turn" });
+    }
+
+    // Load player's melds
+    const handRow = await db.oneOrNone(
+      `SELECT melds FROM player_hands WHERE game_id = $1 AND player_id = $2`,
+      [gameId, session.user.id]
+    );
+    if (!handRow) return res.status(404).json({ error: "Player hand not found" });
+    
+    const melds = Array.isArray(handRow.melds) ? handRow.melds : (handRow.melds ? JSON.parse(handRow.melds) : []);
+
+    // Helper to persist melds
+    async function saveMelds(updatedMelds: any[]) {
+      await db.none(
+        `UPDATE player_hands SET melds = $1 WHERE game_id = $2 AND player_id = $3`,
+        [JSON.stringify(updatedMelds), gameId, session.user.id]
+      );
+    }
+
+    // Helper to validate meld after change
+    async function isMeldValid(cardIds: number[]): Promise<boolean> {
+      if (!cardIds || cardIds.length < 3) return false;
+      const cards = await db.manyOrNone(
+        `SELECT id, suit, rank FROM game_cards WHERE game_id = $1 AND id = ANY($2)` ,
+        [gameId, cardIds]
+      );
+      if (!cards || cards.length !== cardIds.length) return false;
+      const seq = GameLogic.validateSequence(cards as any, state.hidden_joker_rank);
+      if (seq.valid) return true;
+      return GameLogic.validateMeld(cards as any, state.hidden_joker_rank);
+    }
+
+    if (from === "meld" && to === "hand") {
+      if (!Number.isInteger(fromMeldIndex) || !Array.isArray(melds[fromMeldIndex])) {
+        return res.status(400).json({ error: "Invalid source meld" });
+      }
+      const sourceMeld: number[] = melds[fromMeldIndex];
+      if (!sourceMeld.includes(cardId)) {
+        return res.status(400).json({ error: "Card not found in meld" });
+      }
+
+      const updatedMeld = sourceMeld.filter((id: number) => id !== cardId);
+      
+      // If removing this card would make the meld invalid (< 3 cards or doesn't form valid sequence)
+      // then delete the entire meld and move all cards back to hand
+      if (!(await isMeldValid(updatedMeld))) {
+        console.log(`[move-card-between-groups] Removing card would invalidate meld ${fromMeldIndex}, moving all cards to hand`);
+        
+        // Move ALL cards from this meld back to hand
+        for (const meldCardId of sourceMeld) {
+          const maxPosRow = await db.oneOrNone<{ pos: number }>(
+            `SELECT COALESCE(MAX(position), -1) AS pos FROM game_cards WHERE game_id = $1 AND player_id = $2 AND location = 'player_hand'`,
+            [gameId, session.user.id]
+          );
+          const newPos = (maxPosRow?.pos ?? -1) + 1;
+          
+          await db.none(
+            `UPDATE game_cards SET location = 'player_hand', position = $1 WHERE id = $2 AND game_id = $3 AND player_id = $4`,
+            [newPos, meldCardId, gameId, session.user.id]
+          );
+        }
+
+        // Remove this meld entirely
+        const updatedMelds = melds.filter((_, idx) => idx !== fromMeldIndex);
+        await saveMelds(updatedMelds);
+
+        const gameState = await GameLogic.getGameState(gameId);
+        return res.json({ success: true, gameState, message: "Meld dissolved - all cards returned to hand" });
+      }
+
+      const updatedMelds = [...melds];
+      updatedMelds[fromMeldIndex] = updatedMeld;
+
+      // Move card to hand with next position
+      const maxPosRow = await db.oneOrNone<{ pos: number }>(
+        `SELECT COALESCE(MAX(position), -1) AS pos FROM game_cards WHERE game_id = $1 AND player_id = $2 AND location = 'player_hand'`,
+        [gameId, session.user.id]
+      );
+      const newPos = (maxPosRow?.pos ?? -1) + 1;
+
+      await db.none(
+        `UPDATE game_cards SET location = 'player_hand', position = $1 WHERE id = $2 AND game_id = $3 AND player_id = $4`,
+        [newPos, cardId, gameId, session.user.id]
+      );
+
+      await saveMelds(updatedMelds);
+
+      const gameState = await GameLogic.getGameState(gameId);
+      return res.json({ success: true, gameState });
+    }
+
+    if (from === "hand" && to === "meld") {
+      if (!Number.isInteger(toMeldIndex) || !Array.isArray(melds[toMeldIndex])) {
+        return res.status(400).json({ error: "Invalid target meld" });
+      }
+
+      const cardInHand = await db.oneOrNone(
+        `SELECT id, suit, rank FROM game_cards WHERE id = $1 AND game_id = $2 AND player_id = $3 AND location = 'player_hand'`,
+        [cardId, gameId, session.user.id]
+      );
+      if (!cardInHand) {
+        return res.status(400).json({ error: "Card not in hand" });
+      }
+
+      const targetMeldIds: number[] = melds[toMeldIndex];
+      const targetCards = await db.manyOrNone(
+        `SELECT id, suit, rank FROM game_cards WHERE game_id = $1 AND id = ANY($2)` ,
+        [gameId, targetMeldIds]
+      );
+      if (!targetCards || targetCards.length !== targetMeldIds.length) {
+        return res.status(400).json({ error: "Invalid meld cards" });
+      }
+
+      const isSeq = GameLogic.validateSequence(targetCards as any, state.hidden_joker_rank).valid;
+      const isSet = GameLogic.validateMeld(targetCards as any, state.hidden_joker_rank);
+
+      let updatedMeld: number[] | null = null;
+
+      if (isSeq) {
+        const extension = GameLogic.canExtendSequence(targetCards as any, cardInHand as any, state.hidden_joker_rank);
+        if (!extension.canExtend) {
+          return res.status(400).json({ error: "Card cannot be added to this sequence" });
+        }
+        updatedMeld = [...targetMeldIds];
+        if (extension.position === "start") updatedMeld.unshift(cardId);
+        else if (extension.position === "end") updatedMeld.push(cardId);
+        else return res.status(400).json({ error: "Invalid sequence position" });
+      } else if (isSet) {
+        // For sets, simply append and re-validate
+        const candidate = [...targetMeldIds, cardId];
+        if (!(await isMeldValid(candidate))) {
+          return res.status(400).json({ error: "Card cannot be added to this set" });
+        }
+        updatedMeld = candidate;
+      } else {
+        return res.status(400).json({ error: "Target meld is invalid" });
+      }
+
+      const updatedMelds = [...melds];
+      updatedMelds[toMeldIndex] = updatedMeld;
+
+      // Move card to laid
+      await db.none(
+        `UPDATE game_cards SET location = 'laid', player_id = $1 WHERE id = $2 AND game_id = $3`,
+        [session.user.id, cardId, gameId]
+      );
+
+      await saveMelds(updatedMelds);
+
+      const gameState = await GameLogic.getGameState(gameId);
+      return res.json({ success: true, gameState });
+    }
+
+    return res.status(400).json({ error: "Unsupported move" });
+  } catch (err) {
+    console.error("/games/:id/move-card-between-groups error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /games/:id/declare – declare winner
 router.post("/:id/declare", async (req, res, next) => {
   const gameId = Number(req.params.id);
@@ -454,11 +814,32 @@ router.post("/:id/declare", async (req, res, next) => {
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    await GameLogic.declareWinner(gameId, session.user.id);
+    // Find the actual winner (player with 0 cards)
+    const actualWinner = await db.oneOrNone<{ player_id: number; count: number }>(
+      `SELECT player_id, COUNT(*) as count 
+       FROM game_cards 
+       WHERE game_id = $1 AND location = 'player_hand'
+       GROUP BY player_id
+       ORDER BY count ASC
+       LIMIT 1`,
+      [gameId]
+    );
+
+    // If someone has 0 cards, they're the winner; otherwise use player with fewest cards
+    let winnerId = session.user.id; // fallback
+    if (actualWinner) {
+      if (Number(actualWinner.count) === 0) {
+        winnerId = actualWinner.player_id;
+      } else {
+        winnerId = actualWinner.player_id;
+      }
+    }
+
+    await GameLogic.declareWinner(gameId, winnerId);
     
     const io = req.app.get("io");
     if (io) {
-      io.emit("game:winner", { gameId, winnerId: session.user.id });
+      io.emit("game:winner", { gameId, winnerId });
     }
 
     res.json({ success: true });
@@ -566,7 +947,23 @@ router.get("/:id/results", async (req, res, next) => {
 
     const players = Array.isArray(gameState?.players) ? gameState.players : [];
     const winnerId = gameState?.winner_id ?? null;
-    const winner = winnerId ? players.find((p: any) => p.player_id === winnerId) : null;
+    let winner = winnerId ? players.find((p: any) => p.player_id === winnerId) : null;
+    
+    // Fallback: if winner has cards but someone else has 0, use the player with 0 cards
+    if (winner && Number(winner.card_count) > 0) {
+      const playerWith0Cards = players.find((p: any) => Number(p.card_count) === 0);
+      if (playerWith0Cards) {
+        console.log(`[results] Correcting winner from ${winner.username} to ${playerWith0Cards.username} (0 cards)`);
+        winner = playerWith0Cards;
+      }
+    }
+    
+    // If no winner found, use player with fewest cards
+    if (!winner && players.length > 0) {
+      const sorted = [...players].sort((a: any, b: any) => Number(a.card_count) - Number(b.card_count));
+      winner = sorted[0];
+    }
+    
     const scores = players
       .map((p: any) => ({ name: p.username, points: Number(p.card_count) || 0 }))
       .sort((a: any, b: any) => a.points - b.points);
