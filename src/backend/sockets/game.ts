@@ -3,10 +3,16 @@ import db from "../db/connection";
 import { GameLogic } from "../services/game-logic";
 
 export function initGameSockets(io: Server, socket: Socket) {
-  // Join a game room
+  // Join a game room (for general game events)
   socket.on("game:join-room", async ({ gameId }) => {
     socket.join(`game:${gameId}`);
     console.log(`Socket ${socket.id} joined game room ${gameId}`);
+  });
+
+  // Join a game room (for chat) - alternative event name
+  socket.on("join-game", async ({ gameId }) => {
+    socket.join(`game-${gameId}`);
+    console.log(`Socket ${socket.id} joined game-${gameId} for chat`);
   });
 
   // Leave a game room

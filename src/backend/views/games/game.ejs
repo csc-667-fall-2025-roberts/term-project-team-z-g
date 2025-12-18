@@ -105,6 +105,10 @@
       .results-title { color: #2b3a67; font-weight: 700; }
       .results-winner { color: #5c3ba0; font-weight: 700; font-size: 1.35rem; }
       .results-joker { background: #e0f7f1; border: 2px solid #1aa68a; border-radius: 10px; padding: 10px 14px; display: inline-block; font-weight: 600; }
+      .results-list { border: 2px solid #d33; border-radius: 10px; padding: 10px 14px; background: #fff; }
+      .results-list + .results-list { margin-top: 10px; }
+      .results-buttons .btn { min-width: 140px; }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
     <script>
       // Fallback: if CDN fails, load from node_modules
@@ -115,10 +119,6 @@
       }
     </script>
     <script src="/js/bundle.js"></script>
-      .results-list { border: 2px solid #d33; border-radius: 10px; padding: 10px 14px; background: #fff; }
-      .results-list + .results-list { margin-top: 10px; }
-      .results-buttons .btn { min-width: 140px; }
-    </style>
   </head>
   <body>
     <nav class="navbar navbar-dark bg-dark shadow-sm">
@@ -133,38 +133,41 @@
     </nav>
 
     <main class="main-container">
-      <div class="container">
-        <div class="card mb-3 shadow">
-          <div class="card-body d-flex justify-content-between align-items-center">
-            <div>
-              <h1 class="h5 mb-1"><%= game.name %></h1>
-              <div class="small text-muted">
-                Game ID: <%= game.id %> · State: <span id="game-state"><%= game.state %></span>
-                <% 
-                  // Find current player's joker_revealed status
-                  const currentUserId = ((typeof session !== 'undefined') && session.user) ? session.user.id : null;
-                  const currentPlayer = gameState?.players?.find(p => p.player_id === currentUserId);
-                  const canSeeJoker = currentPlayer?.joker_revealed;
-                  const headerJoker = (game && game.hidden_joker_rank) || (gameState && gameState.hidden_joker_rank);
-                  
-                  if (headerJoker && canSeeJoker) { 
-                %>
-                  · Joker: <strong class="text-warning"><%= headerJoker %></strong>
-                <% } else if (game.state === 'waiting') { %>
-                  · Joker: <span class="text-muted">(set when game starts)</span>
-                <% } else if (game.state === 'in_progress') { %>
-                  · Joker: <span class="text-muted" id="joker-hidden">❓ (lay pure sequence to reveal)</span>
-                <% } %>
+      <div class="container-fluid">
+        <div class="row">
+          <!-- Left Column: Game Board -->
+          <div class="col-lg-9">
+            <div class="card mb-3 shadow">
+              <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                  <h1 class="h5 mb-1"><%= game.name %></h1>
+                  <div class="small text-muted">
+                    Game ID: <%= game.id %> · State: <span id="game-state"><%= game.state %></span>
+                    <% 
+                      // Find current player's joker_revealed status
+                      const currentUserId = ((typeof session !== 'undefined') && session.user) ? session.user.id : null;
+                      const currentPlayer = gameState?.players?.find(p => p.player_id === currentUserId);
+                      const canSeeJoker = currentPlayer?.joker_revealed;
+                      const headerJoker = (game && game.hidden_joker_rank) || (gameState && gameState.hidden_joker_rank);
+                      
+                      if (headerJoker && canSeeJoker) { 
+                    %>
+                      · Joker: <strong class="text-warning"><%= headerJoker %></strong>
+                    <% } else if (game.state === 'waiting') { %>
+                      · Joker: <span class="text-muted">(set when game starts)</span>
+                    <% } else if (game.state === 'in_progress') { %>
+                      · Joker: <span class="text-muted" id="joker-hidden">❓ (lay pure sequence to reveal)</span>
+                    <% } %>
+                  </div>
+                </div>
+                <div class="d-flex gap-2">
+                  <% if (game.state === 'waiting') { %>
+                    <button id="start-game" class="btn btn-success">Start Game</button>
+                  <% } %>
+                  <button id="declare-btn" class="btn btn-outline-warning" style="display: none;">End Game</button>
+                </div>
               </div>
             </div>
-            <div class="d-flex gap-2">
-              <% if (game.state === 'waiting') { %>
-                <button id="start-game" class="btn btn-success">Start Game</button>
-              <% } %>
-              <button id="declare-btn" class="btn btn-outline-warning" style="display: none;">End Game</button>
-            </div>
-          </div>
-        </div>
 
         <div class="other-players" id="other-players"></div>
 
@@ -241,6 +244,47 @@
             </div>
           </div>
         </div>
+      </div>
+      <!-- End Left Column -->
+
+      <!-- Right Column: Game Chat -->
+      <div class="col-lg-3">
+        <div class="card shadow" style="height: calc(100vh - 100px); display: flex; flex-direction: column;">
+          <div class="card-body d-flex flex-column" style="flex: 1; padding: 1rem;">
+            <h5 class="card-title text-danger mb-3">Game Chat</h5>
+            <div id="game-message-listing" class="mb-3 p-3 bg-light rounded flex-grow-1" style="overflow-y: auto; border: 1px solid #dee2e6; min-height: 0;">
+              <!-- Messages will be appended here -->
+            </div>
+            <form id="game-chat-form" class="d-flex gap-2 mt-auto">
+              <input 
+                type="text" 
+                id="game-chat-input" 
+                class="form-control" 
+                placeholder="Type a message..." 
+                autocomplete="off"
+                maxlength="500"
+              />
+              <button type="submit" class="btn btn-info text-white">Send</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      <!-- End Right Column -->
+    </div>
+    <!-- End Row -->
+
+        <!-- Game Message Template -->
+        <template id="game-message-template">
+          <div class="chat-message mb-2">
+            <div class="d-flex justify-content-between">
+              <span class="message-username fw-bold text-warning"></span>
+              <span class="message-time text-muted small"></span>
+            </div>
+            <div class="text-dark">
+              <span class="message-text"></span>
+            </div>
+          </div>
+        </template>
       </div>
     </main>
 

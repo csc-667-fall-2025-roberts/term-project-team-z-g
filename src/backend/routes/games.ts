@@ -3,6 +3,8 @@ import createHttpError from "http-errors";
 import { Games } from "../db";
 import { GameLogic } from "../services/game-logic";
 import db from "../db/connection";
+import * as GameChat from "../db/game-chat";
+import { GAME_CHAT_MESSAGE, GAME_CHAT_LISTING } from "../../shared/keys";
 
 const router = express.Router();
 
@@ -1027,6 +1029,63 @@ router.get("/:id/state", async (req, res, next) => {
     res.json({ gameState: cleanState, playerHand, myLaidCards });
   } catch (err) {
     console.error('Error fetching game state:', err);
+    next(err);
+  }
+});
+
+// GET /games/:id/chat - Load game chat history
+router.get("/:id/chat", async (req, res, next) => {
+  try {
+    const session: any = (req as any).session;
+    if (!session || !session.user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const gameId = parseInt(req.params.id);
+    const messages = await GameChat.list(gameId, 50);
+    
+    const io = req.app.get("io");
+    if (io) {
+      // Emit to the user's session room
+      io.to(session.id).emit(GAME_CHAT_LISTING, { messages });
+    }
+    
+    res.json({ messages });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /games/:id/chat - Send a game chat message
+router.post("/:id/chat", async (req, res, next) => {
+  try {
+    const session: any = (req as any).session;
+    if (!session || !session.user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const gameId = parseInt(req.params.id);
+    const { message } = req.body;
+
+    if (!message || message.trim().length === 0) {
+      return res.status(400).json({ error: "Message cannot be empty" });
+    }
+
+    const savedMessage = await GameChat.create(gameId, session.user.id, message.trim());
+    
+    const messageWithUser = {
+      ...savedMessage,
+      username: session.user.username
+    };
+
+    const io = req.app.get("io");
+    if (io) {
+      // Emit to all users in this game room
+      io.to(`game-${gameId}`).emit(GAME_CHAT_MESSAGE, messageWithUser);
+    }
+
+    res.status(201).json(messageWithUser);
+  } catch (err) {
     next(err);
   }
 });

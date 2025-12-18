@@ -5,6 +5,10 @@ export const GLOBAL_ROOM = "room:global";
 export const CHAT_MESSAGE = "chat:message";
 export const CHAT_LISTING = "chat:listing";
 
+// Game chat events
+export const GAME_CHAT_MESSAGE = "game-chat:message";
+export const GAME_CHAT_LISTING = "game-chat:listing";
+
 // Game events
 export const GAME_CREATED = "game:created";
 export const GAME_UPDATED = "game:updated";
