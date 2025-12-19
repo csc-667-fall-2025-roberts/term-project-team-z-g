@@ -2,22 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Game #<%= game.id %> – Hidden Joker Rummy</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="/css/main.css" />
     <style>
       .playing-card {
-        width: 80px;
-        height: 112px;
+        width: min(8vw, 80px);
+        height: min(11vw, 112px);
         border: 2px solid #333;
         border-radius: 8px;
-        padding: 8px;
-        margin: 4px;
+        padding: 0.7vw 0.7vw;
+        margin: 0.5vw;
         display: inline-block;
         background: white;
         cursor: grab;
         transition: transform 0.2s, box-shadow 0.2s;
         user-select: none;
+        font-size: 1.1rem;
       }
       .playing-card:active {
         cursor: grabbing;
@@ -47,7 +49,7 @@
       }
       .game-center {
         display: flex;
-        gap: 20px;
+        gap: 8px; /* Reduced gap for compact look */
         justify-content: center;
         margin: 30px 0;
       }
@@ -67,10 +69,11 @@
         background: rgba(13, 110, 253, 0.1);
       }
       .player-hand {
-        min-height: 140px;
-        padding: 20px;
+        min-height: 12vh;
+        padding: 2vw 1vw;
         background: #f8f9fa;
         border-radius: 10px;
+        overflow-x: auto;
       }
       .other-players {
         display: flex;
@@ -105,10 +108,6 @@
       .results-title { color: #2b3a67; font-weight: 700; }
       .results-winner { color: #5c3ba0; font-weight: 700; font-size: 1.35rem; }
       .results-joker { background: #e0f7f1; border: 2px solid #1aa68a; border-radius: 10px; padding: 10px 14px; display: inline-block; font-weight: 600; }
-      .results-list { border: 2px solid #d33; border-radius: 10px; padding: 10px 14px; background: #fff; }
-      .results-list + .results-list { margin-top: 10px; }
-      .results-buttons .btn { min-width: 140px; }
-    </style>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
     <script>
       // Fallback: if CDN fails, load from node_modules
@@ -119,6 +118,10 @@
       }
     </script>
     <script src="/js/bundle.js"></script>
+      .results-list { border: 2px solid #d33; border-radius: 10px; padding: 10px 14px; background: #fff; }
+      .results-list + .results-list { margin-top: 10px; }
+      .results-buttons .btn { min-width: 140px; }
+    </style>
   </head>
   <body>
     <nav class="navbar navbar-dark bg-dark shadow-sm">
@@ -133,96 +136,109 @@
     </nav>
 
     <main class="main-container">
-      <div class="container-fluid">
-        <div class="row">
-          <!-- Left Column: Game Board -->
-          <div class="col-lg-9">
-            <div class="card mb-3 shadow">
-              <div class="card-body d-flex justify-content-between align-items-center">
-                <div>
-                  <h1 class="h5 mb-1"><%= game.name %></h1>
-                  <div class="small text-muted">
-                    Game ID: <%= game.id %> · State: <span id="game-state"><%= game.state %></span>
-                    <% 
-                      // Find current player's joker_revealed status
-                      const currentUserId = ((typeof session !== 'undefined') && session.user) ? session.user.id : null;
-                      const currentPlayer = gameState?.players?.find(p => p.player_id === currentUserId);
-                      const canSeeJoker = currentPlayer?.joker_revealed;
-                      const headerJoker = (game && game.hidden_joker_rank) || (gameState && gameState.hidden_joker_rank);
-                      
-                      if (headerJoker && canSeeJoker) { 
-                    %>
-                      · Joker: <strong class="text-warning"><%= headerJoker %></strong>
-                    <% } else if (game.state === 'waiting') { %>
-                      · Joker: <span class="text-muted">(set when game starts)</span>
-                    <% } else if (game.state === 'in_progress') { %>
-                      · Joker: <span class="text-muted" id="joker-hidden">❓ (lay pure sequence to reveal)</span>
-                    <% } %>
-                  </div>
-                </div>
-                <div class="d-flex gap-2">
-                  <% if (game.state === 'waiting') { %>
-                    <button id="start-game" class="btn btn-success">Start Game</button>
-                  <% } %>
-                  <button id="declare-btn" class="btn btn-outline-warning" style="display: none;">End Game</button>
-                </div>
+      <div class="container">
+        <div class="card mb-3 shadow">
+          <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+              <h1 class="h5 mb-1"><%= game.name %></h1>
+              <div class="small text-muted">
+                Game ID: <%= game.id %> · State: <span id="game-state"><%= game.state %></span>
+                <% 
+                  // Find current player's joker_revealed status
+                  const currentUserId = ((typeof session !== 'undefined') && session.user) ? session.user.id : null;
+                  const currentPlayer = gameState?.players?.find(p => p.player_id === currentUserId);
+                  const canSeeJoker = currentPlayer?.joker_revealed;
+                  const headerJoker = (game && game.hidden_joker_rank) || (gameState && gameState.hidden_joker_rank);
+                  
+                  if (headerJoker && canSeeJoker) { 
+                %>
+                  · Joker: <strong class="text-warning"><%= headerJoker %></strong>
+                <% } else if (game.state === 'waiting') { %>
+                  · Joker: <span class="text-muted">(set when game starts)</span>
+                <% } else if (game.state === 'in_progress') { %>
+                  · Joker: <span class="text-muted" id="joker-hidden">❓ (lay pure sequence to reveal)</span>
+                <% } %>
               </div>
             </div>
+            <div class="d-flex gap-2">
+              <% if (game.state === 'waiting') { %>
+                <button id="start-game" class="btn btn-success">Start Game</button>
+              <% } %>
+              <button id="declare-btn" class="btn btn-outline-warning" style="display: none;">End Game</button>
+            </div>
+          </div>
+        </div>
 
         <div class="other-players" id="other-players"></div>
 
-        <div class="game-center">
-          <div class="deck-area" id="draw-deck-btn">
-            <div class="text-center">
-              <div class="card-back playing-card">🎴</div>
-              <div class="small mt-2">Draw Deck</div>
-              <div class="small text-muted" id="deck-count">52</div>
+        <div style="display: flex; flex-direction: row; align-items: flex-start; gap: 0; width: 100%; min-width: 0;">
+          <div style="flex: 1 1 0; min-width: 0; max-width: 100vw;">
+            <div class="game-center" style="margin: 0;">
+              <div class="deck-area" id="draw-deck-btn">
+                <div class="text-center">
+                  <div class="card-back playing-card">🎴</div>
+                  <div class="small mt-2">Draw Deck</div>
+                  <div class="small text-muted" id="deck-count">52</div>
+                </div>
+              </div>
+              <div class="deck-area" id="draw-discard-btn">
+                <div class="text-center">
+                  <div id="discard-top-card">
+                    <div class="text-muted">Discard Pile</div>
+                    <div class="small text-muted">Empty</div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-          <div class="deck-area" id="draw-discard-btn">
-            <div class="text-center">
-              <div id="discard-top-card">
-                <div class="text-muted">Discard Pile</div>
-                <div class="small text-muted">Empty</div>
+            <!-- Hand and laid sets will be below both deck/discard and chat, spanning full width -->
+            <div class="player-hand mt-4">
+              <h5 class="text-dark">Your Hand</h5>
+              <div id="player-hand" class="d-flex flex-wrap"></div>
+              <div class="mt-3">
+                <button id="lay-down-set-btn" class="btn btn-success me-2">Lay Down Sequence</button>
+                <button id="discard-btn" class="btn" style="background: #ff7043; color: #fff;" disabled>Discard Selected Card</button>
+                <span class="small" style="color: #43a047; margin-left: 12px;" id="turn-indicator"></span>
+              </div>
+              <div id="meld-message" class="mt-2 small"></div>
+            </div>
+            <div class="card mt-3">
+              <div class="card-body">
+                <h5 class="h6 mb-2">Your Laid Sets</h5>
+                <div id="laid-sets" class="d-flex flex-wrap gap-2 mb-3"></div>
+                <div class="d-flex align-items-center gap-2">
+                  <label for="meld-select" class="small text-muted">Select a set:</label>
+                  <select id="meld-select" class="form-select form-select-sm" style="max-width: 220px;"></select>
+                  <button id="add-to-meld-btn" class="btn btn-outline-success btn-sm" disabled>Add selected card to set</button>
+                  <span id="add-to-meld-msg" class="small ms-2"></span>
+                </div>
+              </div>
+            </div>
+            <div id="error-alert" class="alert alert-danger mt-3" style="display: none;"></div>
+            <div id="finished-banner" class="alert alert-success mt-3" style="display: none;">
+              <div class="d-flex flex-column gap-2">
+                <span id="finished-text">Game over!</span>
+                <img id="results-img" class="results-image" src="/images/IMG_1340.jpeg" alt="Game results" onerror="this.style.display='none'" />
+                <div>
+                  <button id="finished-back-btn" class="btn btn-outline-light btn-sm">View Results Page</button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-
-        <div class="player-hand">
-          <h5 class="text-dark">Your Hand</h5>
-          <div id="player-hand" class="d-flex flex-wrap"></div>
-          <div class="mt-3">
-            <button id="lay-down-set-btn" class="btn btn-success me-2">Lay Down Sequence</button>
-            <button id="discard-btn" class="btn btn-primary" disabled>Discard Selected Card</button>
-            <span class="small text-muted ms-3" id="turn-indicator"></span>
-          </div>
-          <div id="meld-message" class="mt-2 small"></div>
-        </div>
-
-        <div class="card mt-3">
-          <div class="card-body">
-            <h5 class="h6 mb-2">Your Laid Sets</h5>
-            <div id="laid-sets" class="d-flex flex-wrap gap-2 mb-3"></div>
-            <div class="d-flex align-items-center gap-2">
-              <label for="meld-select" class="small text-muted">Select a set:</label>
-              <select id="meld-select" class="form-select form-select-sm" style="max-width: 220px;"></select>
-              <button id="add-to-meld-btn" class="btn btn-outline-success btn-sm" disabled>Add selected card to set</button>
-              <span id="add-to-meld-msg" class="small ms-2"></span>
+          <div id="game-chat" style="width: min(28vw, 340px); min-width: 180px; align-self: stretch; margin-left: 2vw; max-width: 100vw;">
+            <div style="background: #fff; border: 1px solid #e0e0e0; display: flex; flex-direction: column; height: 100%; border-radius: 8px 8px 0 0; box-shadow: none; min-height: 40vh; max-height: 80vh;">
+              <div style="background: #e53935; color: #fff; font-weight: 600; border-radius: 8px 8px 0 0; padding: 10px 18px; font-size: 1.08rem; letter-spacing: 0.5px;">Game Chat</div>
+              <div id="messages" style="flex: 1 1 auto; height: 0; overflow-y: auto; background: #fff; padding: 16px 12px 8px 12px; border-bottom: 1px solid #eee;"></div>
+              <form id="chat-form" style="display: flex; align-items: center; padding: 12px; background: #fff; border-radius: 0 0 0 0; gap: 8px; margin: 0;">
+                <input id="message-input" type="text" placeholder="Type a message..." autocomplete="off" style="flex: 1 1 auto; border-radius: 0; border: 1px solid #e0e0e0; background: #fff; padding: 7px 12px; font-size: 1rem; outline: none;" />
+                <button type="submit" style="background: #2196f3; color: #fff; border: none; border-radius: 0; padding: 7px 18px; font-weight: 600; font-size: 1rem; box-shadow: none; transition: background 0.2s;">Send</button>
+              </form>
             </div>
           </div>
         </div>
+        <!-- Hand and laid sets will be below both deck/discard and chat, spanning full width -->
 
-        <div id="error-alert" class="alert alert-danger mt-3" style="display: none;"></div>
-        <div id="finished-banner" class="alert alert-success mt-3" style="display: none;">
-          <div class="d-flex flex-column gap-2">
-            <span id="finished-text">Game over!</span>
-            <img id="results-img" class="results-image" src="/images/IMG_1340.jpeg" alt="Game results" onerror="this.style.display='none'" />
-            <div>
-              <button id="finished-back-btn" class="btn btn-outline-light btn-sm">View Results Page</button>
-            </div>
-          </div>
-        </div>
+
+
 
         <!-- Results Modal -->
         <div class="modal fade" id="results-modal" tabindex="-1" aria-hidden="true">
@@ -244,47 +260,6 @@
             </div>
           </div>
         </div>
-      </div>
-      <!-- End Left Column -->
-
-      <!-- Right Column: Game Chat -->
-      <div class="col-lg-3">
-        <div class="card shadow" style="height: calc(100vh - 100px); display: flex; flex-direction: column;">
-          <div class="card-body d-flex flex-column" style="flex: 1; padding: 1rem;">
-            <h5 class="card-title text-danger mb-3">Game Chat</h5>
-            <div id="game-message-listing" class="mb-3 p-3 bg-light rounded flex-grow-1" style="overflow-y: auto; border: 1px solid #dee2e6; min-height: 0;">
-              <!-- Messages will be appended here -->
-            </div>
-            <form id="game-chat-form" class="d-flex gap-2 mt-auto">
-              <input 
-                type="text" 
-                id="game-chat-input" 
-                class="form-control" 
-                placeholder="Type a message..." 
-                autocomplete="off"
-                maxlength="500"
-              />
-              <button type="submit" class="btn btn-info text-white">Send</button>
-            </form>
-          </div>
-        </div>
-      </div>
-      <!-- End Right Column -->
-    </div>
-    <!-- End Row -->
-
-        <!-- Game Message Template -->
-        <template id="game-message-template">
-          <div class="chat-message mb-2">
-            <div class="d-flex justify-content-between">
-              <span class="message-username fw-bold text-warning"></span>
-              <span class="message-time text-muted small"></span>
-            </div>
-            <div class="text-dark">
-              <span class="message-text"></span>
-            </div>
-          </div>
-        </template>
       </div>
     </main>
 
@@ -1288,5 +1263,10 @@
       updateSetButton();
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+      window.gameId = <%= game.id %>;
+    </script>
+    <script type="module" src="/js/game-chat.js"></script>
   </body>
 </html>

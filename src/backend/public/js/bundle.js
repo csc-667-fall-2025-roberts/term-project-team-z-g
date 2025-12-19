@@ -3084,11 +3084,11 @@
       if (~this._readyState.indexOf("open"))
         return this;
       this.engine = new Socket(this.uri, this.opts);
-      const socket4 = this.engine;
+      const socket3 = this.engine;
       const self2 = this;
       this._readyState = "opening";
       this.skipReconnect = false;
-      const openSubDestroy = on(socket4, "open", function() {
+      const openSubDestroy = on(socket3, "open", function() {
         self2.onopen();
         fn && fn();
       });
@@ -3102,13 +3102,13 @@
           this.maybeReconnectOnOpen();
         }
       };
-      const errorSub = on(socket4, "error", onError);
+      const errorSub = on(socket3, "error", onError);
       if (false !== this._timeout) {
         const timeout = this._timeout;
         const timer = this.setTimeoutFn(() => {
           openSubDestroy();
           onError(new Error("timeout"));
-          socket4.close();
+          socket3.close();
         }, timeout);
         if (this.opts.autoUnref) {
           timer.unref();
@@ -3139,12 +3139,12 @@
       this.cleanup();
       this._readyState = "open";
       this.emitReserved("open");
-      const socket4 = this.engine;
+      const socket3 = this.engine;
       this.subs.push(
-        on(socket4, "ping", this.onping.bind(this)),
-        on(socket4, "data", this.ondata.bind(this)),
-        on(socket4, "error", this.onerror.bind(this)),
-        on(socket4, "close", this.onclose.bind(this)),
+        on(socket3, "ping", this.onping.bind(this)),
+        on(socket3, "data", this.ondata.bind(this)),
+        on(socket3, "error", this.onerror.bind(this)),
+        on(socket3, "close", this.onclose.bind(this)),
         // @ts-ignore
         on(this.decoder, "decoded", this.ondecoded.bind(this))
       );
@@ -3194,14 +3194,14 @@
      * @public
      */
     socket(nsp, opts) {
-      let socket4 = this.nsps[nsp];
-      if (!socket4) {
-        socket4 = new Socket2(this, nsp, opts);
-        this.nsps[nsp] = socket4;
-      } else if (this._autoConnect && !socket4.active) {
-        socket4.connect();
+      let socket3 = this.nsps[nsp];
+      if (!socket3) {
+        socket3 = new Socket2(this, nsp, opts);
+        this.nsps[nsp] = socket3;
+      } else if (this._autoConnect && !socket3.active) {
+        socket3.connect();
       }
-      return socket4;
+      return socket3;
     }
     /**
      * Called upon a socket close.
@@ -3209,11 +3209,11 @@
      * @param socket
      * @private
      */
-    _destroy(socket4) {
+    _destroy(socket3) {
       const nsps = Object.keys(this.nsps);
       for (const nsp of nsps) {
-        const socket5 = this.nsps[nsp];
-        if (socket5.active) {
+        const socket4 = this.nsps[nsp];
+        if (socket4.active) {
           return;
         }
       }
@@ -3757,152 +3757,12 @@
     }
   });
 
-  // src/shared/keys.ts
-  var GAME_CHAT_MESSAGE = "game-chat:message";
-  var GAME_CHAT_LISTING = "game-chat:listing";
-
-  // src/frontend/game-chat.ts
-  var socket3 = lookup2();
-  var formatTimeAgo = (date) => {
-    const d = typeof date === "string" ? new Date(date) : date;
-    const now = /* @__PURE__ */ new Date();
-    const seconds = Math.floor((now.getTime() - d.getTime()) / 1e3);
-    if (seconds < 60) return "just now";
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    if (days < 7) return `${days}d ago`;
-    return d.toLocaleDateString();
-  };
-  var appendGameMessage = (payload) => {
-    const { username, created_at, message } = payload;
-    const messageTemplate2 = document.querySelector("#game-message-template");
-    if (!messageTemplate2) return;
-    const clone = messageTemplate2.content.cloneNode(true);
-    const timeSpan = clone.querySelector(".message-time");
-    const time = new Date(created_at);
-    if (timeSpan) {
-      timeSpan.textContent = formatTimeAgo(time);
-      timeSpan.dataset.timestamp = time.getTime().toString();
-    }
-    const usernameSpan = clone.querySelector(".message-username");
-    if (usernameSpan) {
-      usernameSpan.textContent = username;
-    }
-    const msgSpan = clone.querySelector(".message-text");
-    if (msgSpan) {
-      msgSpan.textContent = message;
-    }
-    const listing2 = document.querySelector("#game-message-listing");
-    if (listing2) {
-      listing2.appendChild(clone);
-      listing2.scrollTop = listing2.scrollHeight;
-    }
-  };
-  var updateAllTimestamps = () => {
-    const listing2 = document.querySelector("#game-message-listing");
-    if (!listing2) return;
-    const timestamps = listing2.querySelectorAll(".message-time");
-    timestamps.forEach((el) => {
-      const timestamp = parseInt(el.dataset.timestamp || "0");
-      if (timestamp) {
-        el.textContent = formatTimeAgo(new Date(timestamp));
-      }
-    });
-  };
-  setInterval(updateAllTimestamps, 1e4);
-  var initGameChat = (gameId2) => {
-    console.log("initGameChat called with gameId:", gameId2);
-    socket3.emit("join-game", { gameId: gameId2 });
-    console.log("Emitted join-game event");
-    fetch(`/games/${gameId2}/chat`, {
-      method: "GET",
-      credentials: "include"
-    }).then((res) => res.json()).then((data) => {
-      console.log("Fetched chat history JSON:", data);
-      if (data?.messages?.length) {
-        const listing2 = document.querySelector("#game-message-listing");
-        if (listing2) {
-          listing2.innerHTML = "";
-          data.messages.forEach((msg) => appendGameMessage(msg));
-        }
-      }
-    }).catch((err) => console.error("Error loading chat history:", err));
-    console.log("Fetching chat history...");
-    socket3.on(GAME_CHAT_LISTING, ({ messages }) => {
-      console.log("Received GAME_CHAT_LISTING:", messages);
-      const listing2 = document.querySelector("#game-message-listing");
-      if (listing2) {
-        listing2.innerHTML = "";
-        messages.forEach((msg) => {
-          appendGameMessage(msg);
-        });
-      }
-    });
-    socket3.on(GAME_CHAT_MESSAGE, (payload) => {
-      console.log("Received GAME_CHAT_MESSAGE:", payload);
-      appendGameMessage(payload);
-    });
-    const form2 = document.querySelector("#game-chat-form");
-    const input2 = document.querySelector("#game-chat-input");
-    console.log("Form element:", form2);
-    console.log("Input element:", input2);
-    if (form2 && input2) {
-      form2.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        console.log("Form submitted");
-        const message = input2.value.trim();
-        console.log("Message to send:", message);
-        if (!message) return;
-        try {
-          const response = await fetch(`/games/${gameId2}/chat`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            credentials: "include",
-            body: JSON.stringify({ message })
-          });
-          console.log("Response status:", response.status);
-          if (response.ok) {
-            const data = await response.json();
-            console.log("Response data:", data);
-            appendGameMessage({
-              username: data.username || "You",
-              message: data.message,
-              created_at: data.created_at
-            });
-            input2.value = "";
-          } else {
-            console.error("Failed to send message");
-          }
-        } catch (err) {
-          console.error("Error sending message:", err);
-        }
-      });
-    }
-  };
-
   // src/frontend/entrypoint.ts
   var currentPath = window.location.pathname;
   if (currentPath === "/lobby") {
     console.log("Lobby page loaded");
   } else if (currentPath.startsWith("/games/")) {
     console.log("Game page loaded");
-    const startGameChat = () => {
-      const match = currentPath.match(/\/games\/(\d+)/);
-      if (match) {
-        const gameId2 = parseInt(match[1]);
-        initGameChat(gameId2);
-      }
-    };
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", startGameChat, { once: true });
-    } else {
-      startGameChat();
-    }
   }
 })();
 //# sourceMappingURL=bundle.js.map
