@@ -3542,19 +3542,24 @@
   var input = document.querySelector("#message-submit input");
   var button = document.querySelector("#message-submit button");
   var messageTemplate = document.querySelector("#template-chat-message");
+  var formatTimeAgo = (date) => {
+    const d = typeof date === "string" ? new Date(date) : date;
+    const now = /* @__PURE__ */ new Date();
+    const seconds = Math.floor((now.getTime() - d.getTime()) / 1e3);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return d.toLocaleDateString();
+  };
   var appendMessage = (payload) => {
     const { username, created_at, message } = payload;
     const clone = messageTemplate.content.cloneNode(true);
     const timeSpan = clone.querySelector(".message-time");
-    const time = new Date(created_at);
-    timeSpan.textContent = time.toLocaleString(void 0, {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-      hour: "numeric",
-      minute: "2-digit",
-      second: "2-digit"
-    });
+    timeSpan.textContent = formatTimeAgo(created_at);
     const usernameSpan = clone.querySelector(".message-username");
     usernameSpan.textContent = username;
     const msgSpan = clone.querySelector(".message-text");
@@ -3563,11 +3568,10 @@
     listing.scrollTop = listing.scrollHeight;
   };
   socket2.on(CHAT_LISTING, ({ messages }) => {
-    console.log(CHAT_LISTING, { messages });
-    listing.innerHTML = "";
     messages.forEach((message) => {
       appendMessage(message);
     });
+    listing.scrollTop = listing.scrollHeight;
   });
   socket2.on(
     CHAT_MESSAGE,
@@ -3576,6 +3580,7 @@
       console.log(CHAT_MESSAGE, payload);
       const msg = payload.message ?? payload;
       appendMessage(msg);
+      listing.scrollTop = listing.scrollHeight;
     }
   );
   if (form) {
@@ -3763,7 +3768,7 @@
 
   // src/frontend/game-chat.ts
   var socket3 = lookup2();
-  var formatTimeAgo = (date) => {
+  var formatTimeAgo2 = (date) => {
     const d = typeof date === "string" ? new Date(date) : date;
     const now = /* @__PURE__ */ new Date();
     const seconds = Math.floor((now.getTime() - d.getTime()) / 1e3);
@@ -3784,7 +3789,7 @@
     const timeSpan = clone.querySelector(".message-time");
     const time = new Date(created_at);
     if (timeSpan) {
-      timeSpan.textContent = formatTimeAgo(time);
+      timeSpan.textContent = formatTimeAgo2(time);
       timeSpan.dataset.timestamp = time.getTime().toString();
     }
     const usernameSpan = clone.querySelector(".message-username");
@@ -3808,7 +3813,7 @@
     timestamps.forEach((el) => {
       const timestamp = parseInt(el.dataset.timestamp || "0");
       if (timestamp) {
-        el.textContent = formatTimeAgo(new Date(timestamp));
+        el.textContent = formatTimeAgo2(new Date(timestamp));
       }
     });
   };
@@ -3867,13 +3872,6 @@
           });
           console.log("Response status:", response.status);
           if (response.ok) {
-            const data = await response.json();
-            console.log("Response data:", data);
-            appendGameMessage({
-              username: data.username || "You",
-              message: data.message,
-              created_at: data.created_at
-            });
             input2.value = "";
           } else {
             console.error("Failed to send message");

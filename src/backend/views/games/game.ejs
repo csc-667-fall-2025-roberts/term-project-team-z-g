@@ -102,9 +102,11 @@
         border-radius: 16px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.25);
       }
-      .results-title { color: #2b3a67; font-weight: 700; }
-      .results-winner { color: #5c3ba0; font-weight: 700; font-size: 1.35rem; }
-      .results-joker { background: #e0f7f1; border: 2px solid #1aa68a; border-radius: 10px; padding: 10px 14px; display: inline-block; font-weight: 600; }
+      .results-title { color: #000 !important; font-weight: 700; }
+      .results-winner { color: #000 !important; font-weight: 700; font-size: 1.35rem; }
+      .results-joker { background: #e0f7f1; border: 2px solid #1aa68a; border-radius: 10px; padding: 10px 14px; display: inline-block; font-weight: 600; color: #000 !important; }
+      .results-list, .results-list * { color: #000 !important; }
+      .modal-content.results-card, .modal-content.results-card * { color: #000 !important; }
       .results-list { border: 2px solid #d33; border-radius: 10px; padding: 10px 14px; background: #fff; }
       .results-list + .results-list { margin-top: 10px; }
       .results-buttons .btn { min-width: 140px; }
@@ -1261,7 +1263,13 @@
           const rank = data?.hiddenJokerRank;
           if (rank) {
             console.log('Revealing joker rank:', rank);
-            // Update the header to show the joker rank
+            // Update the header to show the joker rank (main header area)
+            const header = document.querySelector('.card-body.d-flex .small.text-muted');
+            if (header && header.innerHTML.includes('Joker:')) {
+              // Replace the Joker: ... part with the revealed joker
+              header.innerHTML = header.innerHTML.replace(/Joker:[^·<]*/, 'Joker: <strong class="text-warning">' + rank + '</strong>');
+            }
+            // Also update the fallback span if present
             const jokerHidden = document.getElementById('joker-hidden');
             if (jokerHidden) {
               jokerHidden.innerHTML = '<strong class="text-warning">' + rank + '</strong>';
@@ -1274,6 +1282,8 @@
                 currentPlayer.joker_revealed = true;
               }
             }
+            // Force UI update so all elements reflect the new joker
+            if (typeof updateUI === 'function') updateUI();
           }
         });
 

@@ -121,7 +121,7 @@ export const initGameChat = (gameId: number) => {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       console.log("Form submitted");
-      
+
       const message = input.value.trim();
       console.log("Message to send:", message);
       if (!message) return;
@@ -138,14 +138,7 @@ export const initGameChat = (gameId: number) => {
 
         console.log("Response status:", response.status);
         if (response.ok) {
-          const data = await response.json();
-          console.log("Response data:", data);
-          // Show the message optimistically
-          appendGameMessage({
-            username: data.username || "You",
-            message: data.message,
-            created_at: data.created_at,
-          });
+          // Only clear the input, do not append message optimistically
           input.value = "";
         } else {
           console.error("Failed to send message");

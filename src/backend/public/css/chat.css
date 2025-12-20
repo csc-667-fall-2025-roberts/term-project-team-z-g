@@ -82,10 +82,10 @@ body{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica
 #message-submit input[type="text"] {
   flex: 1 1 auto;
   padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid #e5e7eb;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.3);
-  color: #fff;
+  background: #f7f8fa;
+  color: #222;
 }
 
 #message-submit input[type="text"]::placeholder {

@@ -10,21 +10,27 @@ const input = document.querySelector<HTMLInputElement>("#message-submit input")!
 const button = document.querySelector<HTMLButtonElement>("#message-submit button")!;
 const messageTemplate = document.querySelector<HTMLTemplateElement>("#template-chat-message")!;
 
+const formatTimeAgo = (date: Date | string): string => {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - d.getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString();
+};
+
 const appendMessage = (payload: { username: string; created_at: string | Date; message: string }) => {
   const { username, created_at, message } = payload;
 
   const clone = messageTemplate.content.cloneNode(true) as DocumentFragment;
 
   const timeSpan = clone.querySelector(".message-time");
-  const time = new Date(created_at);
-  timeSpan!.textContent = time.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+  timeSpan!.textContent = formatTimeAgo(created_at);
 
   const usernameSpan = clone.querySelector(".message-username");
   usernameSpan!.textContent = username;
@@ -38,16 +44,16 @@ const appendMessage = (payload: { username: string; created_at: string | Date; m
 };
 
 // Load initial messages
-socket.on(chatKeys.CHAT_LISTING, ({ messages }: { messages: ChatMessageWithUser[] }) => {
-  console.log(chatKeys.CHAT_LISTING, { messages });
 
-  // Clear placeholder
-  listing.innerHTML = '';
-  
+socket.on(chatKeys.CHAT_LISTING, ({ messages }: { messages: ChatMessageWithUser[] }) => {
   messages.forEach((message) => {
     appendMessage(message);
   });
+
+  // Scroll to bottom after loading messages
+  listing.scrollTop = listing.scrollHeight;
 });
+
 
 // Listen for new messages
 socket.on(
@@ -60,6 +66,8 @@ socket.on(
     const msg = (payload as any).message ?? (payload as ChatMessageWithUser);
 
     appendMessage(msg);
+    // Scroll to bottom when a new message arrives
+    listing.scrollTop = listing.scrollHeight;
   }
 );
 
@@ -91,4 +99,3 @@ if (form) {
     }
   });
 }
-
