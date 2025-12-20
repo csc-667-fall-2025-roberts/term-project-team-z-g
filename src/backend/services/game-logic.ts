@@ -190,7 +190,7 @@ export class GameLogic {
       [gameId, playerId]
     );
 
-    // Check if player has already drawn this turn
+    // Only allow one draw per turn (has_drawn)
     if (playerHand?.has_drawn) {
       throw new Error("You have already drawn a card this turn. You must discard before drawing again.");
     }
@@ -201,8 +201,8 @@ export class GameLogic {
       [gameId, playerId]
     );
 
-    // Check if player has more than 13 cards (should only happen if they drew and haven't discarded yet)
-    if (handSize.count > 13) {
+    // Allow draw if player has 13 cards, block if already at 14 or more
+    if (handSize.count >= 14) {
       throw new Error("You must discard a card before drawing again.");
     }
 
@@ -286,7 +286,7 @@ export class GameLogic {
       [gameId, playerId]
     );
 
-    // Check if player has already drawn this turn
+    // Only allow one draw per turn (has_drawn)
     if (playerHand?.has_drawn) {
       throw new Error("You have already drawn a card this turn. You must discard before drawing again.");
     }
@@ -297,8 +297,8 @@ export class GameLogic {
       [gameId, playerId]
     );
 
-    // Check if player has more than 13 cards (should only happen if they drew and haven't discarded yet)
-    if (handSize.count > 13) {
+    // Check if player has more than 14 cards (should only happen if they drew and haven't discarded yet)
+    if (handSize.count > 14) {
       throw new Error("You must discard a card before drawing again.");
     }
 
@@ -559,34 +559,13 @@ export class GameLogic {
     const nonWild = cards.filter(c => c.rank !== hiddenJokerRank);
     const wildcards = cards.filter(c => c.rank === hiddenJokerRank);
 
-    // Check non-wildcard cards
-    if (nonWild.length === 0) {
-      // All wildcards is not a valid set
-      return false;
-    }
-
     // All non-wildcard cards must have the same rank
+    if (nonWild.length === 0) return false;
     const ranks = new Set(nonWild.map(c => c.rank));
-    if (ranks.size !== 1) {
-      return false;
-    }
+    if (ranks.size !== 1) return false;
 
-    // All non-wildcard cards must have distinct suits
-    const suits = new Set(nonWild.map(c => c.suit));
-    if (suits.size !== nonWild.length) {
-      return false;
-    }
-
-    // Total cards must be 3-4
-    const totalCards = nonWild.length + wildcards.length;
-    if (totalCards < 3 || totalCards > 4) {
-      return false;
-    }
-
-    // Total suits (non-wild + wildcard substitutes) must equal total cards
-    // wildcards can fill any missing suits
-    const totalSuits = suits.size + wildcards.length;
-    return totalSuits >= nonWild.length && totalSuits <= 4;
+    // Wildcards can substitute any rank, suits can repeat (no distinct suit requirement)
+    return true;
   }
 
   /**
